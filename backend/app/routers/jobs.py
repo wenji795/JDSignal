@@ -1,0 +1,261 @@
+"""职位相关API端点"""
+from fastapi import APIRouter, Depends, HTTPException, Query
+from sqlmodel import Session, select, or_
+from typing import List, Optional
+from uuid import UUID
+
+from app.database import get_session
+from app.models import Job, Extraction, JobStatus, Seniority
+from app.schemas import JobCreate, JobUpdate, JobResponse, ExtractionResponse
+from app.extractors.keyword_extractor import extract_and_save
+
+router = APIRouter(prefix="/jobs", tags=["jobs"])
+
+
+@router.post(
+    "",
+    response_model=JobResponse,
+    status_code=201,
+    summary="创建新职位",
+    description="""
+    创建新职位并自动运行关键词提取。
+    
+    支持两种模式：
+    - **Direct模式**: 直接提供jd_text字段
+    - **URL Capture模式**: 提供url和selected_text字段（可选jd_text）
+    
+    规则：
+    - 如果jd_text缺失但selected_text存在，使用selected_text作为jd_text
+    - 至少需要提供jd_text或selected_text之一
+    - source字段自动设置为"manual"（direct模式）或"capture"（url capture模式）
+    """,
+    response_description="创建的职位信息（包含提取结果）"
+)
+def create_job(job_data: JobCreate, session: Session = Depends(get_session)):
+    """创建新职位并自动运行提取"""
+    # model_validator已经处理了jd_text和source的转换
+    # 排除selected_text字段（它不应该保存到数据库）
+    job_dict = job_data.model_dump(exclude={"selected_text"})
+    job = Job(**job_dict)
+    session.add(job)
+    session.commit()
+    session.refresh(job)
+    
+    # 自动运行提取
+    try:
+        extract_and_save(job.id, job.jd_text, session)
+        session.refresh(job)
+    except Exception as e:
+        # 即使提取失败，也返回创建的职位
+        pass
+    
+    # 获取提取结果
+    extraction = session.exec(select(Extraction).where(Extraction.job_id == job.id)).first()
+    
+    response_data = {
+        "id": job.id,
+        "source": job.source,
+        "url": job.url,
+        "title": job.title,
+        "company": job.company,
+        "location": job.location,
+        "posted_date": job.posted_date,
+        "captured_at": job.captured_at,
+        "jd_text": job.jd_text,
+        "status": job.status,
+        "role_family": job.role_family,
+        "seniority": job.seniority,
+        "extraction": ExtractionResponse(
+            id=extraction.id,
+            job_id=extraction.job_id,
+            keywords_json=extraction.keywords_json,
+            must_have_json=extraction.must_have_json,
+            nice_to_have_json=extraction.nice_to_have_json,
+            years_required=extraction.years_required,
+            degree_required=extraction.degree_required,
+            certifications_json=extraction.certifications_json,
+            extracted_at=extraction.extracted_at
+        ) if extraction else None
+    }
+    
+    return JobResponse(**response_data)
+
+
+@router.get("", response_model=List[JobResponse])
+def list_jobs(
+    status: Optional[JobStatus] = Query(None, description="按状态过滤"),
+    role_family: Optional[str] = Query(None, description="按角色族过滤"),
+    seniority: Optional[Seniority] = Query(None, description="按资历级别过滤"),
+    keyword: Optional[str] = Query(None, description="关键词搜索（在jd_text中）"),
+    location: Optional[str] = Query(None, description="按地点过滤（支持部分匹配，如'New Zealand'或'NZ'）"),
+    session: Session = Depends(get_session)
+):
+    """列出所有职位（支持过滤）"""
+    statement = select(Job)
+    
+    # 应用过滤条件
+    conditions = []
+    if status:
+        conditions.append(Job.status == status)
+    if role_family:
+        conditions.append(Job.role_family == role_family)
+    if seniority:
+        conditions.append(Job.seniority == seniority)
+    if keyword:
+        conditions.append(Job.jd_text.contains(keyword))
+    if location:
+        # 支持部分匹配
+        conditions.append(Job.location.contains(location))
+    
+    if conditions:
+        for condition in conditions:
+            statement = statement.where(condition)
+    
+    statement = statement.order_by(Job.captured_at.desc())
+    jobs = session.exec(statement).all()
+    
+    # 构建响应
+    result = []
+    for job in jobs:
+        extraction = session.exec(select(Extraction).where(Extraction.job_id == job.id)).first()
+        response_data = {
+            "id": job.id,
+            "source": job.source,
+            "url": job.url,
+            "title": job.title,
+            "company": job.company,
+            "location": job.location,
+            "posted_date": job.posted_date,
+            "captured_at": job.captured_at,
+            "jd_text": job.jd_text,
+            "status": job.status,
+            "role_family": job.role_family,
+            "seniority": job.seniority,
+            "extraction": ExtractionResponse(
+                id=extraction.id,
+                job_id=extraction.job_id,
+                keywords_json=extraction.keywords_json,
+                must_have_json=extraction.must_have_json,
+                nice_to_have_json=extraction.nice_to_have_json,
+                years_required=extraction.years_required,
+                degree_required=extraction.degree_required,
+                certifications_json=extraction.certifications_json,
+                extracted_at=extraction.extracted_at
+            ) if extraction else None
+        }
+        result.append(JobResponse(**response_data))
+    
+    return result
+
+
+@router.get("/{job_id}", response_model=JobResponse)
+def get_job(job_id: UUID, session: Session = Depends(get_session)):
+    """获取特定职位"""
+    job = session.get(Job, job_id)
+    if not job:
+        raise HTTPException(status_code=404, detail="Job not found")
+    
+    extraction = session.exec(select(Extraction).where(Extraction.job_id == job_id)).first()
+    
+    response_data = {
+        "id": job.id,
+        "source": job.source,
+        "url": job.url,
+        "title": job.title,
+        "company": job.company,
+        "location": job.location,
+        "posted_date": job.posted_date,
+        "captured_at": job.captured_at,
+        "jd_text": job.jd_text,
+        "status": job.status,
+        "role_family": job.role_family,
+        "seniority": job.seniority,
+        "extraction": ExtractionResponse(
+            id=extraction.id,
+            job_id=extraction.job_id,
+            keywords_json=extraction.keywords_json,
+            must_have_json=extraction.must_have_json,
+            nice_to_have_json=extraction.nice_to_have_json,
+            years_required=extraction.years_required,
+            degree_required=extraction.degree_required,
+            certifications_json=extraction.certifications_json,
+            extracted_at=extraction.extracted_at
+        ) if extraction else None
+    }
+    
+    return JobResponse(**response_data)
+
+
+@router.patch("/{job_id}", response_model=JobResponse)
+def update_job(job_id: UUID, job_data: JobUpdate, session: Session = Depends(get_session)):
+    """更新职位信息"""
+    job = session.get(Job, job_id)
+    if not job:
+        raise HTTPException(status_code=404, detail="Job not found")
+    
+    # 更新字段
+    update_data = job_data.model_dump(exclude_unset=True)
+    for field, value in update_data.items():
+        setattr(job, field, value)
+    
+    # 如果jd_text更新了，重新运行提取
+    if "jd_text" in update_data:
+        extract_and_save(job.id, job.jd_text, session)
+    
+    session.add(job)
+    session.commit()
+    session.refresh(job)
+    
+    extraction = session.exec(select(Extraction).where(Extraction.job_id == job_id)).first()
+    
+    response_data = {
+        "id": job.id,
+        "source": job.source,
+        "url": job.url,
+        "title": job.title,
+        "company": job.company,
+        "location": job.location,
+        "posted_date": job.posted_date,
+        "captured_at": job.captured_at,
+        "jd_text": job.jd_text,
+        "status": job.status,
+        "role_family": job.role_family,
+        "seniority": job.seniority,
+        "extraction": ExtractionResponse(
+            id=extraction.id,
+            job_id=extraction.job_id,
+            keywords_json=extraction.keywords_json,
+            must_have_json=extraction.must_have_json,
+            nice_to_have_json=extraction.nice_to_have_json,
+            years_required=extraction.years_required,
+            degree_required=extraction.degree_required,
+            certifications_json=extraction.certifications_json,
+            extracted_at=extraction.extracted_at
+        ) if extraction else None
+    }
+    
+    return JobResponse(**response_data)
+
+
+@router.get("/{job_id}/extraction", response_model=ExtractionResponse)
+def get_extraction(job_id: UUID, session: Session = Depends(get_session)):
+    """获取职位的提取结果"""
+    job = session.get(Job, job_id)
+    if not job:
+        raise HTTPException(status_code=404, detail="Job not found")
+    
+    extraction = session.exec(select(Extraction).where(Extraction.job_id == job_id)).first()
+    if not extraction:
+        raise HTTPException(status_code=404, detail="Extraction not found")
+    
+    return ExtractionResponse(
+        id=extraction.id,
+        job_id=extraction.job_id,
+        keywords_json=extraction.keywords_json,
+        must_have_json=extraction.must_have_json,
+        nice_to_have_json=extraction.nice_to_have_json,
+        years_required=extraction.years_required,
+        degree_required=extraction.degree_required,
+        certifications_json=extraction.certifications_json,
+        extracted_at=extraction.extracted_at
+    )

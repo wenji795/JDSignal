@@ -1,0 +1,424 @@
+{
+  "skills": [
+    {
+      "term": "Python",
+      "category": "language",
+      "aliases": ["python3", "python 3", "py"]
+    },
+    {
+      "term": "Java",
+      "category": "language",
+      "aliases": ["java 8", "java 11", "java 17"]
+    },
+    {
+      "term": "JavaScript",
+      "category": "language",
+      "aliases": ["js", "ecmascript", "es6", "es2015"]
+    },
+    {
+      "term": "TypeScript",
+      "category": "language",
+      "aliases": ["ts"]
+    },
+    {
+      "term": "Go",
+      "category": "language",
+      "aliases": ["golang"]
+    },
+    {
+      "term": "Rust",
+      "category": "language",
+      "aliases": []
+    },
+    {
+      "term": "C++",
+      "category": "language",
+      "aliases": ["cpp", "c plus plus"]
+    },
+    {
+      "term": "C#",
+      "category": "language",
+      "aliases": ["csharp", "c-sharp"]
+    },
+    {
+      "term": "SQL",
+      "category": "language",
+      "aliases": ["sql server", "mysql", "postgresql", "postgres"]
+    },
+    {
+      "term": "React",
+      "category": "framework",
+      "aliases": ["react.js", "reactjs"]
+    },
+    {
+      "term": "Vue",
+      "category": "framework",
+      "aliases": ["vue.js", "vuejs"]
+    },
+    {
+      "term": "Angular",
+      "category": "framework",
+      "aliases": ["angular.js", "angularjs"]
+    },
+    {
+      "term": "Django",
+      "category": "framework",
+      "aliases": []
+    },
+    {
+      "term": "Flask",
+      "category": "framework",
+      "aliases": []
+    },
+    {
+      "term": "FastAPI",
+      "category": "framework",
+      "aliases": ["fast api"]
+    },
+    {
+      "term": "Spring",
+      "category": "framework",
+      "aliases": ["spring boot", "spring framework"]
+    },
+    {
+      "term": "Express",
+      "category": "framework",
+      "aliases": ["express.js", "expressjs"]
+    },
+    {
+      "term": "Node.js",
+      "category": "platform",
+      "aliases": ["node", "nodejs"]
+    },
+    {
+      "term": "Docker",
+      "category": "devops",
+      "aliases": []
+    },
+    {
+      "term": "Kubernetes",
+      "category": "devops",
+      "aliases": ["k8s"]
+    },
+    {
+      "term": "AWS",
+      "category": "cloud",
+      "aliases": ["amazon web services", "amazon aws"]
+    },
+    {
+      "term": "Azure",
+      "category": "cloud",
+      "aliases": ["microsoft azure", "azure cloud"]
+    },
+    {
+      "term": "GCP",
+      "category": "cloud",
+      "aliases": ["google cloud", "google cloud platform"]
+    },
+    {
+      "term": "Terraform",
+      "category": "devops",
+      "aliases": []
+    },
+    {
+      "term": "Git",
+      "category": "devops",
+      "aliases": ["github", "gitlab", "git version control"]
+    },
+    {
+      "term": "Jenkins",
+      "category": "devops",
+      "aliases": []
+    },
+    {
+      "term": "CI/CD",
+      "category": "devops",
+      "aliases": ["continuous integration", "continuous deployment", "cicd"]
+    },
+    {
+      "term": "MongoDB",
+      "category": "data",
+      "aliases": ["mongo"]
+    },
+    {
+      "term": "Redis",
+      "category": "data",
+      "aliases": []
+    },
+    {
+      "term": "PostgreSQL",
+      "category": "data",
+      "aliases": ["postgres"]
+    },
+    {
+      "term": "MySQL",
+      "category": "data",
+      "aliases": []
+    },
+    {
+      "term": "Elasticsearch",
+      "category": "data",
+      "aliases": ["elastic search", "elk"]
+    },
+    {
+      "term": "Kafka",
+      "category": "data",
+      "aliases": ["apache kafka"]
+    },
+    {
+      "term": "Agile",
+      "category": "process",
+      "aliases": ["agile methodology", "agile development"]
+    },
+    {
+      "term": "Scrum",
+      "category": "process",
+      "aliases": ["scrum master", "scrum methodology"]
+    },
+    {
+      "term": "REST API",
+      "category": "framework",
+      "aliases": ["rest", "restful", "rest api design"]
+    },
+    {
+      "term": "GraphQL",
+      "category": "framework",
+      "aliases": ["graph ql"]
+    },
+    {
+      "term": "Microservices",
+      "category": "architecture",
+      "aliases": ["micro services", "microservice architecture"]
+    },
+    {
+      "term": "Machine Learning",
+      "category": "data",
+      "aliases": ["ml", "machine learning"]
+    },
+    {
+      "term": "TensorFlow",
+      "category": "framework",
+      "aliases": ["tensor flow"]
+    },
+    {
+      "term": "PyTorch",
+      "category": "framework",
+      "aliases": ["pytorch", "torch"]
+    },
+    {
+      "term": "Jest",
+      "category": "testing",
+      "aliases": ["jest testing"]
+    },
+    {
+      "term": "Pytest",
+      "category": "testing",
+      "aliases": ["py.test", "pytest framework"]
+    },
+    {
+      "term": "JUnit",
+      "category": "testing",
+      "aliases": ["junit testing"]
+    },
+    {
+      "term": "Selenium",
+      "category": "testing",
+      "aliases": ["selenium webdriver"]
+    },
+    {
+      "term": "Playwright",
+      "category": "testing",
+      "aliases": ["playwright testing", "microsoft playwright"]
+    },
+    {
+      "term": "Cypress",
+      "category": "testing",
+      "aliases": ["cypress testing", "cypress.io"]
+    },
+    {
+      "term": "Appium",
+      "category": "testing",
+      "aliases": ["appium mobile", "appium automation"]
+    },
+    {
+      "term": ".NET",
+      "category": "framework",
+      "aliases": [".net", "dotnet", "dot net", "asp.net", "aspnet"]
+    },
+    {
+      "term": "Flutter",
+      "category": "framework",
+      "aliases": ["flutter framework", "flutter mobile"]
+    },
+    {
+      "term": "iOS",
+      "category": "platform",
+      "aliases": ["ios development", "iphone", "ipad", "swift ios"]
+    },
+    {
+      "term": "Android",
+      "category": "platform",
+      "aliases": ["android development", "android os", "kotlin android"]
+    },
+    {
+      "term": "QA",
+      "category": "testing",
+      "aliases": ["quality assurance", "qa engineer", "qa analyst", "qa specialist"]
+    },
+    {
+      "term": "Testing",
+      "category": "testing",
+      "aliases": ["software testing", "test automation", "automated testing", "manual testing"]
+    },
+    {
+      "term": "Software Engineering",
+      "category": "process",
+      "aliases": ["software engineer", "software development", "software development engineering"]
+    },
+    {
+      "term": "IoT",
+      "category": "platform",
+      "aliases": ["internet of things", "iot devices", "iot development"]
+    },
+    {
+      "term": "Embedded Systems",
+      "category": "platform",
+      "aliases": ["embedded devices", "embedded development", "embedded software", "embedded systems"]
+    },
+    {
+      "term": "TestNG",
+      "category": "testing",
+      "aliases": ["testng framework"]
+    },
+    {
+      "term": "Mocha",
+      "category": "testing",
+      "aliases": ["mocha testing", "mocha.js"]
+    },
+    {
+      "term": "Chai",
+      "category": "testing",
+      "aliases": ["chai assertion", "chai.js"]
+    },
+    {
+      "term": "WebDriver",
+      "category": "testing",
+      "aliases": ["webdriver io", "webdriverio", "wdio"]
+    },
+    {
+      "term": "Postman",
+      "category": "testing",
+      "aliases": ["postman api", "postman testing"]
+    },
+    {
+      "term": "SoapUI",
+      "category": "testing",
+      "aliases": ["soap ui", "soapui testing"]
+    },
+    {
+      "term": "JMeter",
+      "category": "testing",
+      "aliases": ["apache jmeter", "jmeter performance"]
+    },
+    {
+      "term": "LoadRunner",
+      "category": "testing",
+      "aliases": ["hp loadrunner", "loadrunner performance"]
+    },
+    {
+      "term": "Katalon",
+      "category": "testing",
+      "aliases": ["katalon studio", "katalon automation"]
+    },
+    {
+      "term": "TestRail",
+      "category": "testing",
+      "aliases": ["testrail", "test management"]
+    },
+    {
+      "term": "JIRA",
+      "category": "tool",
+      "aliases": ["jira", "atlassian jira", "jira software"]
+    },
+    {
+      "term": "Confluence",
+      "category": "tool",
+      "aliases": ["atlassian confluence"]
+    },
+    {
+      "term": "Bugzilla",
+      "category": "testing",
+      "aliases": ["bug tracking", "bugzilla bug"]
+    },
+    {
+      "term": "Manual Testing",
+      "category": "testing",
+      "aliases": ["manual test", "manual qa"]
+    },
+    {
+      "term": "Automation Testing",
+      "category": "testing",
+      "aliases": ["test automation", "automated test", "automation framework"]
+    },
+    {
+      "term": "Performance Testing",
+      "category": "testing",
+      "aliases": ["performance test", "load testing", "stress testing"]
+    },
+    {
+      "term": "Security Testing",
+      "category": "testing",
+      "aliases": ["security test", "penetration testing", "pen testing"]
+    },
+    {
+      "term": "API Testing",
+      "category": "testing",
+      "aliases": ["api test", "rest api testing", "api automation"]
+    },
+    {
+      "term": "Mobile Testing",
+      "category": "testing",
+      "aliases": ["mobile test", "mobile qa", "mobile automation"]
+    },
+    {
+      "term": "Regression Testing",
+      "category": "testing",
+      "aliases": ["regression test", "regression suite"]
+    },
+    {
+      "term": "Integration Testing",
+      "category": "testing",
+      "aliases": ["integration test", "integration suite"]
+    },
+    {
+      "term": "Unit Testing",
+      "category": "testing",
+      "aliases": ["unit test", "unit tests"]
+    },
+    {
+      "term": "BDD",
+      "category": "testing",
+      "aliases": ["behavior driven development", "bdd framework", "cucumber bdd"]
+    },
+    {
+      "term": "TDD",
+      "category": "testing",
+      "aliases": ["test driven development", "tdd methodology"]
+    },
+    {
+      "term": "Cucumber",
+      "category": "testing",
+      "aliases": ["cucumber framework", "cucumber bdd"]
+    },
+    {
+      "term": "SpecFlow",
+      "category": "testing",
+      "aliases": ["specflow", "specflow bdd"]
+    },
+    {
+      "term": "Gherkin",
+      "category": "testing",
+      "aliases": ["gherkin syntax", "gherkin language"]
+    }
+  ]
+}
