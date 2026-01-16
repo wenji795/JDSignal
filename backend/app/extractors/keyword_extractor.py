@@ -40,6 +40,59 @@ EXPERIENCE_PATTERNS = [
     r'(\d+)\+?\s*years?\s+working'
 ]
 
+# 需要过滤的通用关键词（对分析没有实际价值）
+# 注意：使用小写，匹配时会转换为小写进行比较
+COMMON_KEYWORDS_TO_FILTER = {
+    # 网站和平台名称（大小写不敏感）
+    'seek', 'seek.co.nz', 'linkedin', 'indeed',
+    # 地理位置相关（新西兰特定）
+    'nz', 'new zealand', 'cbd', 'auckland', 'wellington', 'christchurch',
+    'hamilton', 'dunedin', 'tauranga', 'new', 'zealand',
+    # 城市缩写
+    'akl', 'wlg', 'chc', 'ham', 'dun', 'tau',  # Auckland, Wellington, Christchurch等的缩写
+    # 通用职位相关词汇
+    'job', 'jobs', 'position', 'positions', 'role', 'roles', 
+    'opportunity', 'opportunities', 'vacancy', 'vacancies',
+    'apply', 'application', 'applicant', 'applicants', 'candidate', 'candidates',
+    'company', 'companies', 'employer', 'employers', 'organisation', 'organization',
+    # 礼貌用语
+    'please', 'thank', 'thanks', 'regards', 'sincerely',
+    # 工作类型
+    'full time', 'full-time', 'part time', 'part-time', 'permanent', 'contract',
+    'temporary', 'temp', 'casual',
+    # 工作地点类型
+    'remote', 'hybrid', 'onsite', 'on-site', 'work from home', 'wfh',
+    # 薪资和福利
+    'salary', 'wage', 'wages', 'compensation', 'benefits', 'benefit',
+    'package', 'remuneration',
+    # 经验和时间
+    'experience', 'years', 'year', 'month', 'months', 'yr', 'yrs',
+    # 要求和资格
+    'required', 'requirement', 'requirements', 'qualification', 'qualifications',
+    'qualify', 'qualified', 'qualifying',
+    # 技能和能力
+    'skill', 'skills', 'ability', 'abilities', 'capability', 'capabilities',
+    # 团队和工作
+    'team', 'teams', 'work', 'working', 'workplace', 'workplace', 'workforce',
+    # 国家相关
+    'australia', 'au', 'us', 'usa', 'united states', 'america',
+    # 地点相关
+    'location', 'locations', 'area', 'areas', 'region', 'regions', 'city', 'cities',
+    # 描述性词汇
+    'description', 'about', 'overview', 'summary', 'detail', 'details',
+    # 联系信息
+    'contact', 'email', 'phone', 'telephone', 'website', 'www', 'http', 'https',
+    # 导航和操作
+    'click', 'here', 'more', 'information', 'details', 'view', 'see',
+    # 平等机会
+    'equal', 'opportunity', 'employer', 'eoe', 'eeo', 'diversity', 'inclusive',
+    # 其他常见无意义词
+    'the', 'a', 'an', 'and', 'or', 'but', 'if', 'then', 'else',
+    'this', 'that', 'these', 'those', 'is', 'are', 'was', 'were',
+    'be', 'been', 'being', 'have', 'has', 'had', 'do', 'does', 'did',
+    'will', 'would', 'should', 'could', 'may', 'might', 'must', 'can'
+}
+
 # Must-have指示词
 MUST_HAVE_INDICATORS = [
     r'\brequirements?\b', r'\bmust\s+have\b', r'\bessential\b',
@@ -519,10 +572,81 @@ def extract_keywords(jd_text: str) -> Dict:
     # 最终确保没有重复
     nice_to_have_terms = nice_to_have_terms - must_have_terms
     
+    # 过滤掉通用关键词（对分析没有实际价值）
+    def should_filter_keyword(term: str) -> bool:
+        """检查关键词是否应该被过滤"""
+        if not term or len(term.strip()) == 0:
+            return True
+        
+        term_lower = term.lower().strip()
+        term_upper = term.upper().strip()
+        
+        # 检查是否完全匹配过滤列表（大小写不敏感）
+        if term_lower in COMMON_KEYWORDS_TO_FILTER:
+            return True
+        
+        # 检查大写形式（处理 "SEEK", "NZ", "CBD" 等全大写词）
+        if term_upper in COMMON_KEYWORDS_TO_FILTER or term_upper.lower() in COMMON_KEYWORDS_TO_FILTER:
+            return True
+        
+        # 检查是否以过滤词开头或结尾（处理复合词）
+        # 例如："New Zealand" 应该被过滤，但 "New Zealand based" 可能不需要
+        for filter_term in COMMON_KEYWORDS_TO_FILTER:
+            # 完全匹配
+            if term_lower == filter_term:
+                return True
+            # 如果关键词很短（<= 过滤词长度 + 3），且包含过滤词，则过滤
+            # 这样可以过滤 "NZ", "CBD" 等，但保留 "NZ-based" 这样的复合词（如果它们存在）
+            if len(term_lower) <= len(filter_term) + 3:
+                if filter_term in term_lower:
+                    return True
+        
+        # 特殊处理：过滤掉常见的2-3字母缩写（如果不是技术术语）
+        if len(term_lower) <= 3:
+            # 检查是否是已知的技术缩写（白名单）
+            tech_short_acronyms = {'api', 'sql', 'xml', 'json', 'css', 'html', 'url', 'uri', 
+                                   'aws', 'gcp', 'ci', 'cd', 'ui', 'ux', 'qa', 'sdk', 'ide', 
+                                   'cli', 'ssh', 'tls', 'ssl', 'jwt', 'rpc', 'iot', 'ml', 'ai', 
+                                   'etl', 'bi', 'crm', 'erp', 'dns', 'cdn', 'vpn', 'acl', 'iso',
+                                   'tdd', 'bdd', 'ddd', 'k8s', 'pdf', 'csv', 'tsv', 'yaml'}
+            if term_lower not in tech_short_acronyms:
+                # 如果不在技术缩写白名单中，且是常见的地理/通用缩写，则过滤
+                common_short = {'nz', 'au', 'us', 'uk', 'eu', 'cbd', 'hr', 'ceo', 'cto', 'cfo', 
+                               'wfh', 'eoe', 'eeo', 'www', 'akl', 'wlg', 'chc', 'ham', 'dun', 'tau'}
+                if term_lower in common_short:
+                    return True
+        
+        # 过滤掉太短的关键词（少于2个字符，除非是技术缩写如 "C#"）
+        if len(term_lower) < 2:
+            return True
+        
+        # 过滤掉纯数字
+        if term_lower.isdigit():
+            return True
+        
+        return False
+    
+    # 过滤keywords列表
+    filtered_keywords = [
+        kw for kw in keywords
+        if not should_filter_keyword(kw["term"])
+    ]
+    
+    # 过滤must-have和nice-to-have关键词
+    filtered_must_have = [
+        term for term in must_have_terms
+        if not should_filter_keyword(term)
+    ]
+    
+    filtered_nice_to_have = [
+        term for term in nice_to_have_terms
+        if not should_filter_keyword(term)
+    ]
+    
     return {
-        "keywords": keywords,
-        "must_have_keywords": sorted(list(must_have_terms)),
-        "nice_to_have_keywords": sorted(list(nice_to_have_terms)),
+        "keywords": filtered_keywords,
+        "must_have_keywords": sorted(filtered_must_have),
+        "nice_to_have_keywords": sorted(filtered_nice_to_have),
         "years_required": years_required,
         "degree_required": degree_required,
         "certifications": certifications

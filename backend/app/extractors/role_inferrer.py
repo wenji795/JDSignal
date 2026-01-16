@@ -192,28 +192,57 @@ def infer_seniority(title: str, jd_text: str = "") -> Optional[Seniority]:
     # 合并标题和描述文本，转为小写进行匹配
     text = f"{title} {jd_text}".lower()
     
-    # 检查资历级别关键词（按从高到低的顺序）
-    if any(keyword in text for keyword in ['principal', 'architect', 'distinguished', 'fellow']):
-        return Seniority.PRINCIPAL
+    # 排除词：如果标题中包含这些词，不应该被推断为高级别
+    exclusion_keywords = ['assistant', 'coordinator', 'intern', 'trainee', 'junior', 'graduate']
     
-    if any(keyword in text for keyword in ['lead', 'head of', 'director', 'manager']):
-        # 区分是技术lead还是manager
-        if 'manager' in text and 'engineering manager' not in text and 'tech lead' not in text:
+    # 检查是否是assistant/coordinator等初级职位
+    is_assistant_role = any(keyword in text for keyword in ['assistant', 'coordinator', 'intern', 'trainee'])
+    
+    # 检查资历级别关键词（按从高到低的顺序）
+    # 注意：assistant/coordinator等职位不应该被推断为manager/lead
+    if any(keyword in text for keyword in ['principal', 'architect', 'distinguished', 'fellow']):
+        if not is_assistant_role:  # assistant不应该是principal
+            return Seniority.PRINCIPAL
+    
+    if any(keyword in text for keyword in ['lead', 'head of', 'director']):
+        # assistant/coordinator不应该被推断为lead
+        if not is_assistant_role:
+            return Seniority.LEAD
+    
+    # manager关键词需要更严格的检查
+    if 'manager' in text:
+        # 排除assistant manager, office manager等（这些可能是初级职位）
+        # 但保留engineering manager, product manager等（这些是高级职位）
+        if is_assistant_role:
+            # assistant manager通常是初级职位
+            return Seniority.JUNIOR
+        # 检查是否是真正的管理职位
+        manager_contexts = ['engineering manager', 'product manager', 'project manager', 
+                           'development manager', 'technical manager', 'team manager',
+                           'engineering manager', 'software manager', 'it manager']
+        if any(context in text for context in manager_contexts):
             return Seniority.MANAGER
+        # 如果只是单独的manager，且不是assistant，可能是lead级别
         return Seniority.LEAD
     
     if any(keyword in text for keyword in ['staff', 'senior staff']):
-        return Seniority.STAFF
+        if not is_assistant_role:
+            return Seniority.STAFF
     
     if any(keyword in text for keyword in ['senior', 'sr.', 'sr ', 'experienced', '5+ years', '5 years', '6+ years', '7+ years', '8+ years']):
         return Seniority.SENIOR
     
+    # 中级：intermediate, mid等
+    if any(keyword in text for keyword in ['mid', 'middle', 'intermediate', '3+ years', '3 years', '4 years', '4+ years']):
+        return Seniority.MID
+    
+    # 初级：junior, graduate, entry等
     if any(keyword in text for keyword in ['junior', 'jr.', 'jr ', 'entry', 'graduate', 'intern', '0-2 years', '1-2 years', '2 years']):
         return Seniority.JUNIOR
     
-    # 默认中级
-    if any(keyword in text for keyword in ['mid', 'middle', 'intermediate', '3+ years', '3 years', '4 years', '4+ years']):
-        return Seniority.MID
+    # 如果标题包含assistant/coordinator但没有明确的资历级别，默认为junior
+    if is_assistant_role:
+        return Seniority.JUNIOR
     
     return None
 

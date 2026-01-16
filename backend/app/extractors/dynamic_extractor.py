@@ -45,6 +45,13 @@ def extract_camel_case_terms(text: str) -> Set[str]:
     return terms
 
 
+# 需要过滤的通用缩写（对分析没有实际价值）
+COMMON_ACRONYMS_TO_FILTER = {
+    'SEEK', 'NZ', 'CBD', 'AU', 'US', 'USA', 'UK', 'EU',
+    'EOE', 'EEO', 'WFH', 'HR', 'CEO', 'CTO', 'CFO',
+    'WWW', 'HTTP', 'HTTPS', 'URL', 'URI', 'HTML', 'CSS'
+}
+
 def extract_acronyms(text: str) -> Set[str]:
     """提取全大写缩写"""
     terms = set()
@@ -103,7 +110,19 @@ def extract_acronyms(text: str) -> Set[str]:
         'QPU', 'BPU', 'NPU', 'VPU', 'IPU', 'DPU', 'SPU', 'RPU', 'APU', 'PPU',
     }
     
+    # 需要过滤的通用缩写（对分析没有实际价值）
+    common_acronyms_to_filter = {
+        'SEEK', 'NZ', 'CBD', 'AU', 'US', 'USA', 'UK', 'EU', 'NZL',
+        'EOE', 'EEO', 'WFH', 'HR', 'CEO', 'CTO', 'CFO', 'VP', 'GM',
+        'WWW', 'URL', 'URI', 'HTTP', 'HTTPS',  # HTTP/HTTPS保留在tech_acronyms中，但这里过滤
+        'AUC', 'WLG', 'CHC', 'HAM', 'DUN', 'TAU'  # 新西兰城市缩写
+    }
+    
     for match in matches:
+        # 首先检查是否在过滤列表中
+        if match in common_acronyms_to_filter:
+            continue
+        # 检查是否在技术缩写白名单中
         if match in tech_acronyms:
             terms.add(match)
         # 也包含一些常见的组合缩写

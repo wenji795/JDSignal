@@ -4,7 +4,38 @@ import { useEffect, useState } from 'react'
 import { getTrends, type TrendsResponse } from '@/lib/api'
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell } from 'recharts'
 
-const COLORS = ['#0088FE', '#00C49F', '#FFBB28', '#FF8042', '#8884d8', '#82ca9d']
+// 角色族颜色映射（与jobs页面保持一致）
+const roleFamilyColors: Record<string, string> = {
+  'testing': '#db2777',    // pink-600
+  'ai': '#9333ea',         // purple-600
+  'fullstack': '#4f46e5',  // indigo-600
+  'devops': '#059669',      // emerald-600
+  'data': '#2563eb',        // blue-600
+  'mobile': '#0d9488'       // teal-600
+}
+
+// 资历级别颜色映射（与jobs页面保持一致）
+const seniorityColors: Record<string, string> = {
+  'graduate': '#84cc16',    // lime-500 (使用稍深一点的颜色以便在饼图上可见)
+  'junior': '#eab308',      // yellow-500
+  'intermediate': '#f59e0b', // amber-500
+  'mid': '#f59e0b',         // amber-500 (intermediate的映射)
+  'senior': '#f97316'       // orange-500
+}
+
+// 获取角色族颜色
+const getRoleFamilyColor = (roleFamily: string): string => {
+  return roleFamilyColors[roleFamily.toLowerCase()] || '#6b7280' // gray-500作为默认
+}
+
+// 获取资历级别颜色
+const getSeniorityColor = (seniority: string): string => {
+  const key = seniority.toLowerCase()
+  // 处理显示名称到实际值的映射
+  if (key === 'graduate') return seniorityColors['graduate']
+  if (key === 'intermediate') return seniorityColors['intermediate']
+  return seniorityColors[key] || '#6b7280' // gray-500作为默认
+}
 
 export default function TrendsPage() {
   const [trends, setTrends] = useState<TrendsResponse | null>(null)
@@ -23,6 +54,16 @@ export default function TrendsPage() {
     { value: 'data', label: '数据' },
     { value: 'mobile', label: '移动开发' }
   ]
+  
+  // 角色族中文显示名称映射
+  const roleFamilyLabels: Record<string, string> = {
+    'testing': '软件测试',
+    'ai': 'AI/机器学习',
+    'fullstack': '全栈',
+    'devops': 'DevOps',
+    'data': '数据',
+    'mobile': '移动开发'
+  }
 
   useEffect(() => {
     loadTrends()
@@ -165,13 +206,16 @@ export default function TrendsPage() {
                   cx="50%"
                   cy="50%"
                   labelLine={false}
-                  label={({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`}
+                  label={({ name, percent }) => {
+                    const displayName = roleFamilyLabels[name] || name
+                    return `${displayName} ${(percent * 100).toFixed(0)}%`
+                  }}
                   outerRadius={80}
                   fill="#8884d8"
                   dataKey="value"
                 >
-                  {roleFamilyData.map((entry, index) => (
-                    <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
+                  {roleFamilyData.map((entry) => (
+                    <Cell key={`cell-${entry.name}`} fill={getRoleFamilyColor(entry.name)} />
                   ))}
                 </Pie>
                 <Tooltip />
@@ -191,13 +235,20 @@ export default function TrendsPage() {
                   cx="50%"
                   cy="50%"
                   labelLine={false}
-                  label={({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`}
+                  label={({ name, percent }) => {
+                    // 显示友好的名称
+                    const displayName = name === 'junior' ? 'Junior' :
+                                       name === 'mid' ? 'Intermediate' :
+                                       name === 'senior' ? 'Senior' :
+                                       name.charAt(0).toUpperCase() + name.slice(1)
+                    return `${displayName} ${(percent * 100).toFixed(0)}%`
+                  }}
                   outerRadius={80}
                   fill="#8884d8"
                   dataKey="value"
                 >
-                  {seniorityData.map((entry, index) => (
-                    <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
+                  {seniorityData.map((entry) => (
+                    <Cell key={`cell-${entry.name}`} fill={getSeniorityColor(entry.name)} />
                   ))}
                 </Pie>
                 <Tooltip />
@@ -283,22 +334,30 @@ export default function TrendsPage() {
         <div className="bg-white rounded-lg shadow p-6">
           <h2 className="text-xl font-semibold mb-4">各角色族Top关键词</h2>
           <div className="grid md:grid-cols-2 gap-6">
-            {Object.entries(trends.top_keywords_by_role_family).map(([roleFamily, keywords]) => (
-              <div key={roleFamily}>
-                <h3 className="font-semibold mb-2 capitalize">{roleFamily}</h3>
-                <div className="flex flex-wrap gap-2">
-                  {keywords.map((kw, idx) => (
-                    <span
-                      key={idx}
-                      className="px-2 py-1 bg-blue-100 text-blue-800 rounded text-xs"
-                      title={`出现 ${kw.count} 次`}
-                    >
-                      {kw.term} ({kw.count})
-                    </span>
-                  ))}
+            {Object.entries(trends.top_keywords_by_role_family).map(([roleFamily, keywords]) => {
+              // 获取角色族的背景色和文字色
+              const bgColor = roleFamilyColors[roleFamily.toLowerCase()] || '#4f46e5'
+              // 深色背景使用白色文字
+              const textColor = '#ffffff'
+              
+              return (
+                <div key={roleFamily}>
+                  <h3 className="font-semibold mb-2">{roleFamilyLabels[roleFamily] || roleFamily}</h3>
+                  <div className="flex flex-wrap gap-2">
+                    {keywords.map((kw, idx) => (
+                      <span
+                        key={idx}
+                        className="px-2 py-1 rounded text-xs font-medium"
+                        style={{ backgroundColor: bgColor, color: textColor }}
+                        title={`出现 ${kw.count} 次`}
+                      >
+                        {kw.term} ({kw.count})
+                      </span>
+                    ))}
+                  </div>
                 </div>
-              </div>
-            ))}
+              )
+            })}
           </div>
         </div>
       )}

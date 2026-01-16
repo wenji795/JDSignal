@@ -32,7 +32,35 @@ export default function JobsPage() {
     'data': '数据',
     'mobile': '移动开发'
   }
-  const seniorities = ['junior', 'mid', 'senior', 'staff', 'principal', 'lead', 'manager']
+  // 只显示：graduate (映射到junior), junior, intermediate (映射到mid), senior
+  const seniorities = ['graduate', 'junior', 'intermediate', 'senior']
+  
+  // 资历级别显示名称映射
+  const seniorityLabels: Record<string, string> = {
+    'graduate': 'Graduate',
+    'junior': 'Junior',
+    'intermediate': 'Intermediate',
+    'senior': 'Senior'
+  }
+  
+  // 角色族颜色映射（深色背景+白色文字）
+  const roleFamilyColors: Record<string, string> = {
+    'testing': 'bg-pink-600 text-white',
+    'ai': 'bg-purple-600 text-white',
+    'fullstack': 'bg-indigo-600 text-white',
+    'devops': 'bg-emerald-600 text-white',
+    'data': 'bg-blue-600 text-white',
+    'mobile': 'bg-teal-600 text-white'
+  }
+  
+  // 资历级别颜色映射（浅色背景+深色文字）
+  const seniorityColors: Record<string, string> = {
+    'graduate': 'bg-lime-100 text-lime-900',
+    'junior': 'bg-yellow-100 text-yellow-900',
+    'intermediate': 'bg-amber-100 text-amber-900',
+    'senior': 'bg-orange-100 text-orange-900',
+    'mid': 'bg-amber-100 text-amber-900' // intermediate的映射
+  }
 
   useEffect(() => {
     loadJobs()
@@ -136,7 +164,9 @@ export default function JobsPage() {
           >
             <option value="">全部</option>
             {seniorities.map(s => (
-              <option key={s} value={s}>{s}</option>
+              <option key={s} value={s === 'graduate' ? 'junior' : s === 'intermediate' ? 'mid' : s}>
+                {seniorityLabels[s] || s}
+              </option>
             ))}
           </select>
         </div>
@@ -174,15 +204,25 @@ export default function JobsPage() {
                   </div>
                   <div className="flex gap-2 flex-wrap">
                     {job.role_family && (
-                      <span className="px-2 py-1 bg-blue-100 text-blue-800 rounded text-xs">
-                        {job.role_family}
+                      <span className={`px-2 py-1 rounded text-xs font-medium ${roleFamilyColors[job.role_family] || 'bg-gray-600 text-white'}`}>
+                        {roleFamilyLabels[job.role_family] || job.role_family}
                       </span>
                     )}
-                    {job.seniority && (
-                      <span className="px-2 py-1 bg-green-100 text-green-800 rounded text-xs">
-                        {job.seniority}
-                      </span>
-                    )}
+                    {job.seniority && (() => {
+                      const displaySeniority = job.seniority === 'junior' && (job.title.toLowerCase().includes('graduate') || job.title.toLowerCase().includes('entry')) ? 'Graduate' :
+                                               job.seniority === 'junior' ? 'Junior' :
+                                               job.seniority === 'mid' ? 'Intermediate' :
+                                               job.seniority === 'senior' ? 'Senior' :
+                                               job.seniority;
+                      const colorKey = displaySeniority.toLowerCase() === 'graduate' ? 'graduate' :
+                                       displaySeniority.toLowerCase() === 'intermediate' ? 'intermediate' :
+                                       job.seniority;
+                      return (
+                        <span className={`px-2 py-1 rounded text-xs font-medium ${seniorityColors[colorKey] || 'bg-gray-100 text-gray-900'}`}>
+                          {displaySeniority}
+                        </span>
+                      );
+                    })()}
                     <span className={`px-2 py-1 rounded text-xs ${
                       job.status === 'applied' ? 'bg-green-100 text-green-800' :
                       job.status === 'rejected' ? 'bg-red-100 text-red-800' :

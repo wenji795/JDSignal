@@ -86,7 +86,7 @@ def create_job(job_data: JobCreate, session: Session = Depends(get_session)):
 def list_jobs(
     status: Optional[JobStatus] = Query(None, description="按状态过滤"),
     role_family: Optional[str] = Query(None, description="按角色族过滤"),
-    seniority: Optional[Seniority] = Query(None, description="按资历级别过滤"),
+    seniority: Optional[str] = Query(None, description="按资历级别过滤（支持graduate/junior/intermediate/mid/senior）"),
     keyword: Optional[str] = Query(None, description="关键词搜索（在jd_text中）"),
     location: Optional[str] = Query(None, description="按地点过滤（支持部分匹配，如'New Zealand'或'NZ'）"),
     session: Session = Depends(get_session)
@@ -101,7 +101,24 @@ def list_jobs(
     if role_family:
         conditions.append(Job.role_family == role_family)
     if seniority:
-        conditions.append(Job.seniority == seniority)
+        # 映射前端的显示名称到实际的枚举值
+        seniority_mapping = {
+            'graduate': Seniority.JUNIOR,
+            'junior': Seniority.JUNIOR,
+            'intermediate': Seniority.MID,
+            'mid': Seniority.MID,
+            'senior': Seniority.SENIOR
+        }
+        # 如果传入的是映射值，使用映射；否则尝试直接转换
+        mapped_seniority = seniority_mapping.get(seniority.lower())
+        if mapped_seniority:
+            conditions.append(Job.seniority == mapped_seniority)
+        else:
+            # 尝试直接转换为枚举
+            try:
+                conditions.append(Job.seniority == Seniority(seniority.lower()))
+            except ValueError:
+                pass  # 无效的seniority值，忽略
     if keyword:
         conditions.append(Job.jd_text.contains(keyword))
     if location:

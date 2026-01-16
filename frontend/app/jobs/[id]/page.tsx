@@ -88,19 +88,43 @@ export default function JobDetailPage() {
             {job.role_family && (
               <div>
                 <span className="font-semibold">角色族：</span>
-                <span className="px-2 py-1 bg-blue-100 text-blue-800 rounded text-xs">
+                <span className={`px-2 py-1 rounded text-xs font-medium ${
+                  job.role_family === 'testing' ? 'bg-pink-600 text-white' :
+                  job.role_family === 'ai' ? 'bg-purple-600 text-white' :
+                  job.role_family === 'fullstack' ? 'bg-indigo-600 text-white' :
+                  job.role_family === 'devops' ? 'bg-emerald-600 text-white' :
+                  job.role_family === 'data' ? 'bg-blue-600 text-white' :
+                  job.role_family === 'mobile' ? 'bg-teal-600 text-white' :
+                  'bg-gray-600 text-white'
+                }`}>
                   {job.role_family}
                 </span>
               </div>
             )}
-            {job.seniority && (
-              <div>
-                <span className="font-semibold">资历级别：</span>
-                <span className="px-2 py-1 bg-green-100 text-green-800 rounded text-xs">
-                  {job.seniority}
-                </span>
-              </div>
-            )}
+            {job.seniority && (() => {
+              const displaySeniority = job.seniority === 'junior' && (job.title.toLowerCase().includes('graduate') || job.title.toLowerCase().includes('entry')) ? 'Graduate' :
+                                       job.seniority === 'junior' ? 'Junior' :
+                                       job.seniority === 'mid' ? 'Intermediate' :
+                                       job.seniority === 'senior' ? 'Senior' :
+                                       job.seniority;
+              const colorKey = displaySeniority.toLowerCase() === 'graduate' ? 'graduate' :
+                               displaySeniority.toLowerCase() === 'intermediate' ? 'intermediate' :
+                               job.seniority;
+              return (
+                <div>
+                  <span className="font-semibold">资历级别：</span>
+                  <span className={`px-2 py-1 rounded text-xs font-medium ${
+                    colorKey === 'graduate' ? 'bg-lime-100 text-lime-900' :
+                    colorKey === 'junior' ? 'bg-yellow-100 text-yellow-900' :
+                    colorKey === 'intermediate' || colorKey === 'mid' ? 'bg-amber-100 text-amber-900' :
+                    colorKey === 'senior' ? 'bg-orange-100 text-orange-900' :
+                    'bg-gray-100 text-gray-900'
+                  }`}>
+                    {displaySeniority}
+                  </span>
+                </div>
+              );
+            })()}
             <div>
               <span className="font-semibold">状态：</span>
               <span className={`px-2 py-1 rounded text-xs ${
