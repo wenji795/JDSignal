@@ -3,6 +3,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlmodel import Session, select, or_
 from typing import List, Optional
 from uuid import UUID
+from datetime import datetime
 
 from app.database import get_session
 from app.models import Job, Extraction, JobStatus, Seniority
@@ -114,9 +115,36 @@ def list_jobs(
     statement = statement.order_by(Job.captured_at.desc())
     jobs = session.exec(statement).all()
     
+    # 去重：优先使用URL去重（更准确），如果没有URL则使用title+company+location
+    seen_jobs = {}
+    unique_jobs = []
+    for job in jobs:
+        # 优先使用URL作为唯一标识（如果存在）
+        if job.url:
+            key = job.url.lower().strip()
+        else:
+            # 如果没有URL，使用title + company + location组合
+            key = f"{job.title.lower().strip()}|{job.company.lower().strip() if job.company else ''}|{job.location.lower().strip() if job.location else ''}"
+        
+        if key not in seen_jobs:
+            seen_jobs[key] = job
+            unique_jobs.append(job)
+        else:
+            # 如果已存在，保留captured_at更新的
+            existing_job = seen_jobs[key]
+            if job.captured_at and existing_job.captured_at:
+                if job.captured_at > existing_job.captured_at:
+                    # 替换为更新的
+                    index = unique_jobs.index(existing_job)
+                    unique_jobs[index] = job
+                    seen_jobs[key] = job
+    
+    # 去重后重新按captured_at降序排序，确保最新的在最前面
+    unique_jobs.sort(key=lambda j: j.captured_at if j.captured_at else datetime.min, reverse=True)
+    
     # 构建响应
     result = []
-    for job in jobs:
+    for job in unique_jobs:
         extraction = session.exec(select(Extraction).where(Extraction.job_id == job.id)).first()
         response_data = {
             "id": job.id,

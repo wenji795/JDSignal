@@ -186,6 +186,7 @@ class CaptureRequest(BaseModel):
 class CaptureResponse(BaseModel):
     """捕获响应"""
     job_id: UUID
+    message: Optional[str] = None
     top_keywords: List[Dict[str, Any]] = Field(..., description="前20个关键词（按分数排序）")
     
     model_config = {

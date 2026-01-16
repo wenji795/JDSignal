@@ -136,6 +136,11 @@
       "aliases": ["continuous integration", "continuous deployment", "cicd"]
     },
     {
+      "term": "Pipeline",
+      "category": "devops",
+      "aliases": ["ci/cd pipeline", "deployment pipeline", "build pipeline", "pipeline"]
+    },
+    {
       "term": "MongoDB",
       "category": "data",
       "aliases": ["mongo"]
@@ -219,6 +224,11 @@
       "term": "JUnit",
       "category": "testing",
       "aliases": ["junit testing"]
+    },
+    {
+      "term": "XUnit",
+      "category": "testing",
+      "aliases": ["xunit", "x-unit", "xunit.net"]
     },
     {
       "term": "Selenium",
@@ -416,9 +426,39 @@
       "aliases": ["specflow", "specflow bdd"]
     },
     {
+      "term": "Reqnroll",
+      "category": "testing",
+      "aliases": ["reqnroll", "reqnroll bdd"]
+    },
+    {
+      "term": "k6",
+      "category": "testing",
+      "aliases": ["k6 performance", "k6 load testing", "k6.io"]
+    },
+    {
       "term": "Gherkin",
       "category": "testing",
       "aliases": ["gherkin syntax", "gherkin language"]
+    },
+    {
+      "term": "Office365",
+      "category": "tool",
+      "aliases": ["office 365", "office365", "microsoft office 365", "ms office 365"]
+    },
+    {
+      "term": "Microsoft Word",
+      "category": "tool",
+      "aliases": ["word", "ms word", "microsoft word"]
+    },
+    {
+      "term": "Microsoft Excel",
+      "category": "tool",
+      "aliases": ["excel", "ms excel", "microsoft excel"]
+    },
+    {
+      "term": "Microsoft Outlook",
+      "category": "tool",
+      "aliases": ["outlook", "ms outlook", "microsoft outlook"]
     }
   ]
 }

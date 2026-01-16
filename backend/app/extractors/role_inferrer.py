@@ -100,13 +100,13 @@ def infer_role_family(title: str, jd_text: str = "") -> Optional[str]:
     if any(keyword in title_lower for keyword in fullstack_title_keywords):
         return 'fullstack'
     
-    # 后端岗位
+    # 后端岗位 - 统一归类为全栈
     if any(keyword in title_lower for keyword in backend_title_keywords):
-        return 'backend'
+        return 'fullstack'
     
-    # 前端岗位
+    # 前端岗位 - 统一归类为全栈
     if any(keyword in title_lower for keyword in frontend_title_keywords):
-        return 'frontend'
+        return 'fullstack'
     
     # DevOps岗位
     if any(keyword in title_lower for keyword in devops_title_keywords):
@@ -144,12 +144,12 @@ def infer_role_family(title: str, jd_text: str = "") -> Optional[str]:
         if any(keyword in jd_tech_text for keyword in fullstack_tech_keywords):
             return 'fullstack'
         elif any(keyword in jd_tech_text for keyword in backend_tech_keywords):
-            return 'backend'
+            return 'fullstack'  # 后端统一归类为全栈
         elif any(keyword in jd_tech_text for keyword in frontend_tech_keywords):
-            return 'frontend'
+            return 'fullstack'  # 前端统一归类为全栈
         else:
-            # 默认推断为backend（因为大多数software engineer是后端）
-            return 'backend'
+            # 默认推断为全栈
+            return 'fullstack'
     
     # 第三步：如果标题不明确，检查JD文本（但降低优先级）
     # 只在标题完全没有线索时才使用JD文本
@@ -165,9 +165,9 @@ def infer_role_family(title: str, jd_text: str = "") -> Optional[str]:
         if any(keyword in jd_lower for keyword in fullstack_title_keywords):
             return 'fullstack'
         if any(keyword in jd_lower for keyword in backend_title_keywords):
-            return 'backend'
+            return 'fullstack'  # 后端统一归类为全栈
         if any(keyword in jd_lower for keyword in frontend_title_keywords):
-            return 'frontend'
+            return 'fullstack'  # 前端统一归类为全栈
         if any(keyword in jd_lower for keyword in devops_title_keywords):
             return 'devops'
         if any(keyword in jd_lower for keyword in data_title_keywords):

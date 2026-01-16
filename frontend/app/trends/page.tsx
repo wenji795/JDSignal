@@ -11,11 +11,22 @@ export default function TrendsPage() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [days, setDays] = useState(30)
-  const [location, setLocation] = useState('') // 默认分析所有职位
+  const [roleFamily, setRoleFamily] = useState('') // 角色族筛选
+
+  // 角色族选项
+  const roleFamilyOptions = [
+    { value: '', label: '全部' },
+    { value: 'testing', label: '软件测试' },
+    { value: 'ai', label: 'AI/机器学习' },
+    { value: 'fullstack', label: '全栈' },
+    { value: 'devops', label: 'DevOps' },
+    { value: 'data', label: '数据' },
+    { value: 'mobile', label: '移动开发' }
+  ]
 
   useEffect(() => {
     loadTrends()
-  }, [days, location])
+  }, [days, roleFamily])
 
   const loadTrends = async () => {
     try {
@@ -23,11 +34,11 @@ export default function TrendsPage() {
       // 确保空字符串不被发送
       const params: {
         days: number;
-        location?: string;
+        role_family?: string;
       } = { days }
       
-      if (location && location.trim()) {
-        params.location = location
+      if (roleFamily && roleFamily.trim()) {
+        params.role_family = roleFamily
       }
       
       const data = await getTrends(params)
@@ -76,11 +87,21 @@ export default function TrendsPage() {
     value
   }))
 
-  const topKeywordsData = trends.top_keywords.slice(0, 20).map(kw => ({
+  // 根据是否选择了角色族，显示不同的top20关键词
+  const keywordsToShow = roleFamily && trends.selected_role_family_top_keywords 
+    ? trends.selected_role_family_top_keywords 
+    : trends.top_keywords
+  
+  const topKeywordsData = keywordsToShow.slice(0, 20).map(kw => ({
     name: kw.term.length > 15 ? kw.term.substring(0, 15) + '...' : kw.term,
     fullName: kw.term,
     count: kw.count
   }))
+  
+  // 图表标题
+  const keywordsChartTitle = roleFamily && trends.selected_role_family_top_keywords
+    ? `${roleFamilyOptions.find(opt => opt.value === roleFamily)?.label || roleFamily} - Top 20 关键词`
+    : 'Top 20 关键词（全部）'
 
   // 关键词增长数据（取top 10增长）
   const growthData = Object.entries(trends.keyword_growth)
@@ -99,18 +120,15 @@ export default function TrendsPage() {
         <h1 className="text-3xl font-bold">趋势分析</h1>
         <div className="flex items-center gap-4">
           <div className="flex items-center gap-2">
-            <label>地点：</label>
+            <label>角色族：</label>
             <select
-              value={location}
-              onChange={(e) => setLocation(e.target.value)}
+              value={roleFamily}
+              onChange={(e) => setRoleFamily(e.target.value)}
               className="p-2 border rounded"
             >
-              <option value="">全部</option>
-              <option value="Auckland">奥克兰</option>
-              <option value="Wellington">惠灵顿</option>
-              <option value="Christchurch">基督城</option>
-              <option value="Sydney">悉尼</option>
-              <option value="Brisbane">布里斯班</option>
+              {roleFamilyOptions.map(opt => (
+                <option key={opt.value} value={opt.value}>{opt.label}</option>
+              ))}
             </select>
           </div>
           <div className="flex items-center gap-2">
@@ -192,7 +210,7 @@ export default function TrendsPage() {
       {/* Top关键词 */}
       {topKeywordsData.length > 0 && (
         <div className="bg-white rounded-lg shadow p-6 mb-6">
-          <h2 className="text-xl font-semibold mb-4">Top 20 关键词</h2>
+          <h2 className="text-xl font-semibold mb-4">{keywordsChartTitle}</h2>
           <ResponsiveContainer width="100%" height={400}>
             <BarChart data={topKeywordsData}>
               <CartesianGrid strokeDasharray="3 3" />

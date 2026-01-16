@@ -41,6 +41,21 @@ def capture_job(capture_data: CaptureRequest, session: Session = Depends(get_ses
     此端点从Chrome扩展接收用户主动提取的职位信息（通过DOM提取或文本选择），
     创建Job记录并运行关键词提取。
     """
+    # 检查URL是否已存在（如果提供了URL）
+    if capture_data.url:
+        existing = session.exec(select(Job).where(Job.url == capture_data.url)).first()
+        if existing:
+            # 如果已存在，返回现有职位信息
+            extraction = session.exec(select(Extraction).where(Extraction.job_id == existing.id)).first()
+            keywords_data = extraction.keywords_json.get("keywords", []) if extraction else []
+            top_keywords = keywords_data[:20] if keywords_data else []
+            
+            return CaptureResponse(
+                job_id=existing.id,
+                top_keywords=top_keywords,
+                message="职位已存在（URL重复）"
+            )
+    
     # 准备Job数据
     captured_at = capture_data.captured_at if capture_data.captured_at else datetime.utcnow()
     
@@ -51,11 +66,18 @@ def capture_job(capture_data: CaptureRequest, session: Session = Depends(get_ses
     )
     
     # 使用page_title作为title，company_guess作为company
+    # 如果 company_guess 为空或 "Unknown"，则不设置 company 字段（让它为 None）
+    company = capture_data.company_guess
+    if company and company.strip().lower() not in ['unknown', '']:
+        company = company.strip()
+    else:
+        company = None
+    
     job_data = {
         "source": capture_data.source.value,
         "url": capture_data.url,
         "title": capture_data.page_title,
-        "company": capture_data.company_guess or "Unknown",
+        "company": company,
         "location": capture_data.location_guess,
         "jd_text": capture_data.extracted_text,
         "status": JobStatus.NEW,

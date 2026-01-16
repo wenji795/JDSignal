@@ -50,6 +50,7 @@ export interface TrendsResponse {
   count_by_seniority: Record<string, number>;
   top_keywords: Array<{ term: string; count: number }>;
   top_keywords_by_role_family: Record<string, Array<{ term: string; count: number }>>;
+  selected_role_family_top_keywords?: Array<{ term: string; count: number }>;
   keyword_growth: Record<string, {
     first_half_count: number;
     second_half_count: number;
@@ -217,6 +218,46 @@ export async function getTrends(params?: {
     if (error instanceof Error && error.name === 'AbortError') {
       throw new Error('请求超时，请检查后端服务是否运行在 http://127.0.0.1:8000');
     }
+    if (error instanceof TypeError && error.message.includes('fetch')) {
+      throw new Error('无法连接到后端API，请确保后端服务正在运行 (http://127.0.0.1:8000)');
+    }
+    throw error;
+  }
+}
+
+/**
+ * 手动触发抓取任务
+ */
+export async function triggerScrape(params?: {
+  max_per_keyword?: number;
+  headless?: boolean;
+  browser?: string;
+}): Promise<{
+  message: string;
+  status: string;
+  max_per_keyword: number;
+  headless: boolean;
+  browser: string;
+  note: string;
+}> {
+  const url = `${API_BASE_URL}/scraper/trigger`;
+  
+  try {
+    const response = await fetch(url, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(params || {}),
+    });
+    
+    if (!response.ok) {
+      const errorText = await response.text();
+      throw new Error(`Failed to trigger scrape: ${response.status} ${response.statusText} - ${errorText}`);
+    }
+    
+    return response.json();
+  } catch (error) {
     if (error instanceof TypeError && error.message.includes('fetch')) {
       throw new Error('无法连接到后端API，请确保后端服务正在运行 (http://127.0.0.1:8000)');
     }

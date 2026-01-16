@@ -1,4 +1,5 @@
 import type { Metadata } from 'next'
+import Link from 'next/link'
 import './globals.css'
 
 export const metadata: Metadata = {
@@ -16,10 +17,15 @@ export default function RootLayout({
       <body className="antialiased">
         <nav className="bg-gray-900 text-white p-4">
           <div className="container mx-auto flex items-center justify-between">
-            <h1 className="text-xl font-bold">Job JD Tracker</h1>
-            <div className="flex gap-4">
-              <a href="/jobs" className="hover:text-gray-300">职位列表</a>
-              <a href="/trends" className="hover:text-gray-300">趋势分析</a>
+            <Link href="/" className="text-xl font-bold hover:text-gray-300 transition-colors">
+              Job JD Tracker
+            </Link>
+            <div className="flex gap-4 items-center">
+              <Link href="/" className="px-3 py-1 bg-blue-600 hover:bg-blue-700 rounded transition-colors">
+                首页
+              </Link>
+              <Link href="/jobs" className="hover:text-gray-300 transition-colors">职位列表</Link>
+              <Link href="/trends" className="hover:text-gray-300 transition-colors">趋势分析</Link>
             </div>
           </div>
         </nav>

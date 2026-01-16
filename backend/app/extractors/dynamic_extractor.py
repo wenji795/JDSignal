@@ -21,11 +21,11 @@ TECH_PATTERNS = [
 
 # 常见技术栈关键词（用于上下文推断）
 TECH_CONTEXT_KEYWORDS = {
-    'testing': ['test', 'qa', 'quality', 'automation', 'selenium', 'playwright', 'cypress', 'appium'],
+    'testing': ['test', 'qa', 'quality', 'automation', 'selenium', 'playwright', 'cypress', 'appium', 'reqnroll', 'k6', 'jmeter', 'postman'],
     'framework': ['framework', 'library', 'lib', 'sdk'],
     'language': ['language', 'programming', 'code', 'develop'],
     'cloud': ['cloud', 'aws', 'azure', 'gcp', 'infrastructure'],
-    'devops': ['deploy', 'ci/cd', 'pipeline', 'docker', 'kubernetes'],
+    'devops': ['deploy', 'ci/cd', 'pipeline', 'docker', 'kubernetes', 'jenkins'],
     'database': ['database', 'db', 'sql', 'nosql', 'query'],
     'mobile': ['mobile', 'ios', 'android', 'app', 'flutter'],
     'api': ['api', 'rest', 'graphql', 'endpoint', 'service'],
@@ -145,7 +145,7 @@ def infer_category_from_context(term: str, text: str) -> str:
     
     # 检查测试相关
     if any(keyword in text_lower for keyword in TECH_CONTEXT_KEYWORDS['testing']):
-        if any(test_word in term_lower for test_word in ['test', 'qa', 'selenium', 'playwright', 'cypress', 'appium', 'junit', 'pytest', 'jest']):
+        if any(test_word in term_lower for test_word in ['test', 'qa', 'selenium', 'playwright', 'cypress', 'appium', 'junit', 'pytest', 'jest', 'reqnroll', 'k6', 'jmeter', 'postman', 'xunit']):
             return 'testing'
     
     # 检查框架相关
@@ -158,7 +158,11 @@ def infer_category_from_context(term: str, text: str) -> str:
         return 'cloud'
     
     # 检查DevOps
-    if term in ['Docker', 'Kubernetes', 'K8s', 'Jenkins', 'GitLab', 'GitHub']:
+    if term in ['Docker', 'Kubernetes', 'K8s', 'Jenkins', 'GitLab', 'GitHub', 'Pipeline']:
+        return 'devops'
+    
+    # 检查pipeline相关
+    if 'pipeline' in term_lower:
         return 'devops'
     
     # 检查数据库

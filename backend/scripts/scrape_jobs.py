@@ -155,8 +155,14 @@ async def scrape_seek_job(page: Page, job_url: str) -> Optional[Dict[str, Any]]:
         print(f"正在访问: {job_url}")
         await page.goto(job_url, wait_until="networkidle", timeout=30000)
         
-        # 等待页面加载
-        await page.wait_for_timeout(2000)
+        # 等待页面加载 - 增加等待时间确保动态内容加载完成
+        await page.wait_for_timeout(3000)
+        
+        # 等待关键元素加载
+        try:
+            await page.wait_for_selector('h1', timeout=5000)
+        except:
+            pass
         
         job_data = {}
         
@@ -175,20 +181,264 @@ async def scrape_seek_job(page: Page, job_url: str) -> Optional[Dict[str, Any]]:
             except:
                 continue
         
-        # 提取公司名称
-        company_selectors = [
-            'a[data-automation="job-detail-company-name"]',
-            '[data-automation="jobHeaderCompanyName"]',
-            'a[href*="/companies/"]'
-        ]
-        for selector in company_selectors:
+        # 提取公司名称 - 使用多种方法，按优先级排序
+        company_found = False
+        
+        # 方法1: 使用data-automation="advertiser-name"（Seek新版本）
+        # 注意：这个span可能是空的，需要从父元素或兄弟元素获取
+        try:
+            advertiser_elem = await page.query_selector('[data-automation="advertiser-name"]')
+            if advertiser_elem:
+                # 先尝试直接获取文本
+                company_text = (await advertiser_elem.inner_text()).strip()
+                
+                # 如果span是空的，使用JavaScript查找公司名称
+                if not company_text or len(company_text) == 0:
+                    company_text = await advertiser_elem.evaluate('''el => {
+                        // 方法1: 查找父元素中的文本（可能是button、div、a等）
+                        let parent = el.parentElement;
+                        if (parent) {
+                            // 获取父元素的所有文本内容
+                            let parentText = parent.textContent || parent.innerText || '';
+                            // 移除"View all jobs"等后缀
+                            parentText = parentText.replace(/View all jobs/gi, '').trim();
+                            // 移除换行和多余空格
+                            parentText = parentText.replace(/\\s+/g, ' ').trim();
+                            
+                            // 如果父元素有文本，返回第一个有意义的部分
+                            if (parentText && parentText.length > 0) {
+                                // 取第一个单词或短语（通常是公司名）
+                                let parts = parentText.split(/[\\s\\n]+/);
+                                if (parts.length > 0 && parts[0].length > 1) {
+                                    // 如果第一个部分太短，尝试组合前几个部分
+                                    if (parts[0].length < 3 && parts.length > 1) {
+                                        return parts.slice(0, Math.min(3, parts.length)).join(' ').trim();
+                                    }
+                                    return parts[0];
+                                }
+                                return parentText;
+                            }
+                            
+                            // 方法2: 查找兄弟元素
+                            let sibling = parent.firstElementChild || parent.firstChild;
+                            while (sibling) {
+                                if (sibling !== el && sibling.textContent) {
+                                    let siblingText = sibling.textContent.trim();
+                                    if (siblingText && !siblingText.toLowerCase().includes('view all jobs')) {
+                                        return siblingText.split(/[\\s\\n]+/)[0];
+                                    }
+                                }
+                                sibling = sibling.nextSibling;
+                            }
+                            
+                            // 方法3: 查找父元素的第一个文本节点
+                            let walker = document.createTreeWalker(
+                                parent,
+                                NodeFilter.SHOW_TEXT,
+                                null,
+                                false
+                            );
+                            let textNodes = [];
+                            let node;
+                            while (node = walker.nextNode()) {
+                                let text = node.textContent.trim();
+                                if (text && !text.toLowerCase().includes('view all jobs')) {
+                                    textNodes.push(text);
+                                }
+                            }
+                            if (textNodes.length > 0) {
+                                return textNodes[0].split(/[\\s\\n]+/)[0];
+                            }
+                        }
+                        
+                        // 方法4: 查找包含公司名称的相邻元素
+                        let container = el.closest('[class*="company"], [class*="advertiser"], [class*="employer"]');
+                        if (container) {
+                            let containerText = container.textContent || container.innerText || '';
+                            containerText = containerText.replace(/View all jobs/gi, '').trim();
+                            if (containerText) {
+                                return containerText.split(/[\\s\\n]+/)[0];
+                            }
+                        }
+                        
+                        return '';
+                    }''')
+                
+                # 清理和验证公司名称
+                if company_text:
+                    company_text = company_text.strip()
+                    # 移除常见的后缀和无关文本
+                    company_text = re.sub(r'\s*(View all jobs|view all jobs|View All Jobs).*$', '', company_text, flags=re.IGNORECASE)
+                    company_text = company_text.strip()
+                    # 移除可能的HTML实体和特殊字符
+                    company_text = re.sub(r'\s+', ' ', company_text)
+                    
+                    # 验证：公司名应该是合理的长度和格式
+                    if (company_text and 
+                        len(company_text) > 1 and 
+                        len(company_text) < 100 and
+                        company_text.lower() not in ['unknown', 'seek', 'view all jobs', ''] and
+                        not company_text.lower().startswith('view')):
+                        job_data['company'] = company_text
+                        company_found = True
+                        print(f"  ✓ 方法1-找到公司名称: {company_text} (从advertiser-name)")
+        except Exception as e:
+            print(f"    方法1失败: {e}")
+            pass
+        
+        # 方法2: 使用其他data-automation属性
+        if not company_found:
+            automation_selectors = [
+                'a[data-automation="job-detail-company-name"]',
+                '[data-automation="jobHeaderCompanyName"]',
+                '[data-automation="job-detail-company"]',
+                'span[data-automation="job-detail-company-name"]',
+            ]
+            for selector in automation_selectors:
+                try:
+                    company_elem = await page.query_selector(selector)
+                    if company_elem:
+                        company_text = (await company_elem.inner_text()).strip()
+                        if company_text and len(company_text) > 0 and company_text.lower() not in ['unknown', 'seek']:
+                            job_data['company'] = company_text
+                            company_found = True
+                            print(f"  ✓ 方法2-找到公司名称: {company_text} (选择器: {selector})")
+                            break
+                except Exception as e:
+                    continue
+        
+        # 方法2: 查找包含/companies/的链接
+        if not company_found:
             try:
-                company_elem = await page.query_selector(selector)
-                if company_elem:
-                    job_data['company'] = (await company_elem.inner_text()).strip()
-                    break
+                company_links = await page.query_selector_all('a[href*="/companies/"]')
+                for link in company_links:
+                    try:
+                        href = await link.get_attribute('href')
+                        if href and '/companies/' in href:
+                            # 从URL提取公司名
+                            company_slug = href.split('/companies/')[-1].split('/')[0].split('?')[0]
+                            if company_slug and company_slug != 'companies':
+                                # 从slug转换为可读的公司名
+                                company_text = company_slug.replace('-', ' ').title()
+                                # 也尝试获取链接文本
+                                link_text = (await link.inner_text()).strip()
+                                if link_text and len(link_text) > 0 and 'more about' not in link_text.lower():
+                                    company_text = link_text
+                                
+                                if company_text and company_text.lower() not in ['unknown', 'seek', 'more about']:
+                                    job_data['company'] = company_text
+                                    company_found = True
+                                    print(f"  ✓ 方法2-找到公司名称: {company_text} (从链接: {href})")
+                                    break
+                    except:
+                        continue
+            except Exception as e:
+                pass
+        
+        # 方法3: 使用XPath查找包含"More about"或公司相关文本的元素
+        if not company_found:
+            try:
+                # 查找包含"More about"的链接
+                more_about_links = await page.query_selector_all('a')
+                for link in more_about_links:
+                    try:
+                        link_text = (await link.inner_text()).strip()
+                        href = await link.get_attribute('href')
+                        
+                        if href and '/companies/' in href:
+                            # 从URL提取
+                            company_slug = href.split('/companies/')[-1].split('/')[0].split('?')[0]
+                            if company_slug and company_slug != 'companies':
+                                company_text = company_slug.replace('-', ' ').title()
+                                if company_text and company_text.lower() not in ['unknown', 'seek']:
+                                    job_data['company'] = company_text
+                                    company_found = True
+                                    print(f"  ✓ 方法3-找到公司名称: {company_text} (从More about链接)")
+                                    break
+                    except:
+                        continue
+            except Exception as e:
+                pass
+        
+        # 方法4: 查找class包含company的元素
+        if not company_found:
+            class_selectors = [
+                '.job-detail-company-name',
+                '[class*="company-name"]',
+                '[class*="companyName"]',
+                'a[class*="company"]',
+            ]
+            for selector in class_selectors:
+                try:
+                    company_elem = await page.query_selector(selector)
+                    if company_elem:
+                        company_text = (await company_elem.inner_text()).strip()
+                        if company_text and len(company_text) > 0 and company_text.lower() not in ['unknown', 'seek', 'more about', 'about the company']:
+                            job_data['company'] = company_text
+                            company_found = True
+                            print(f"  ✓ 方法4-找到公司名称: {company_text} (选择器: {selector})")
+                            break
+                except Exception as e:
+                    continue
+        
+        # 方法5: 从页面标题中提取（Seek常见格式）
+        if not company_found:
+            try:
+                page_title = await page.title()
+                print(f"    尝试从页面标题提取: {page_title}")
+                
+                # Seek格式1: "Job Title at Company Name | Seek"
+                if ' at ' in page_title:
+                    parts = page_title.split(' at ')
+                    if len(parts) > 1:
+                        company_from_title = parts[1].split(' | ')[0].split(' - ')[0].strip()
+                        # 清理可能的额外信息
+                        company_from_title = re.sub(r'\s*-\s*.*$', '', company_from_title)  # 移除 "- Location" 部分
+                        if company_from_title and company_from_title.lower() not in ['seek', 'unknown', '']:
+                            job_data['company'] = company_from_title
+                            company_found = True
+                            print(f"  ✓ 方法5-从标题提取公司名称: {company_from_title}")
+                
+                # Seek格式2: "Job Title - Company Name | Seek" 或 "Job Title - Company Name - Location | Seek"
+                elif ' - ' in page_title and ' | ' in page_title:
+                    # 找到最后一个 " - " 和 " | " 之间的内容
+                    before_seek = page_title.split(' | ')[0]
+                    parts = before_seek.split(' - ')
+                    if len(parts) >= 2:
+                        # 取倒数第二个部分作为公司名（最后一个通常是地点）
+                        company_from_title = parts[-2].strip() if len(parts) > 2 else parts[-1].strip()
+                        if company_from_title and company_from_title.lower() not in ['seek', 'unknown', '']:
+                            job_data['company'] = company_from_title
+                            company_found = True
+                            print(f"  ✓ 方法5-从标题提取公司名称: {company_from_title}")
+            except Exception as e:
+                print(f"    从标题提取失败: {e}")
+                pass
+        
+        # 最后尝试：从JD文本的开头提取（有些职位会在开头提到公司名）
+        if not company_found and job_data.get('jd_text'):
+            try:
+                jd_text = job_data['jd_text'][:500]  # 只检查前500字符
+                # 查找常见的公司名称模式
+                # 模式1: "About [Company Name]"
+                match = re.search(r'About\s+([A-Z][a-zA-Z\s&]+)', jd_text)
+                if match:
+                    potential_company = match.group(1).strip()
+                    if len(potential_company) < 50:  # 合理的公司名长度
+                        job_data['company'] = potential_company
+                        company_found = True
+                        print(f"  ✓ 从JD文本提取公司名称: {potential_company}")
             except:
-                continue
+                pass
+        
+        if not company_found:
+            print(f"  ⚠ 未能提取公司名称，尝试从页面标题提取...")
+            # 打印页面标题用于调试
+            try:
+                page_title = await page.title()
+                print(f"    页面标题: {page_title}")
+            except:
+                pass
         
         # 提取地点
         location_selectors = [
@@ -252,21 +502,95 @@ async def check_api_connection() -> bool:
         return False
 
 
+def is_nz_location(location: Optional[str]) -> bool:
+    """检查location是否在新西兰"""
+    if not location:
+        return False
+    
+    location_lower = location.lower()
+    
+    # 新西兰城市和地区关键词
+    nz_keywords = [
+        'new zealand', 'nz', 'auckland', 'wellington', 'christchurch', 
+        'hamilton', 'dunedin', 'tauranga', 'lower hutt', 'palmerston north',
+        'napier', 'rotorua', 'new plymouth', 'whangarei', 'invercargill',
+        'nelson', 'hastings', 'gisborne', 'blenheim', 'timaru',
+        'queenstown', 'wanganui', 'masterton', 'levin', 'otago',
+        'canterbury', 'waikato', 'bay of plenty', 'manawatu', 'taranaki',
+        'northland', 'southland', 'westland', 'marlborough', 'tasman'
+    ]
+    
+    # 检查是否包含新西兰关键词
+    for keyword in nz_keywords:
+        if keyword in location_lower:
+            return True
+    
+    # 排除澳大利亚的地点
+    au_keywords = [
+        'australia', 'au', 'sydney', 'melbourne', 'brisbane', 'perth',
+        'adelaide', 'gold coast', 'newcastle', 'canberra', 'sunshine coast',
+        'wollongong', 'hobart', 'geelong', 'townsville', 'cairns',
+        'darwin', 'toowoomba', 'ballarat', 'bendigo', 'albury',
+        'queensland', 'qld', 'new south wales', 'nsw', 'victoria', 'vic',
+        'western australia', 'wa', 'south australia', 'sa', 'tasmania', 'tas',
+        'northern territory', 'nt', 'australian capital territory', 'act'
+    ]
+    
+    # 如果包含澳大利亚关键词，返回False
+    for keyword in au_keywords:
+        if keyword in location_lower:
+            return False
+    
+    # 排除美国的地点
+    us_keywords = [
+        'united states', 'usa', 'us', 'america', 'american',
+        'california', 'ca', 'texas', 'tx', 'new york', 'ny', 'florida', 'fl',
+        'san francisco', 'los angeles', 'san diego', 'chicago', 'houston', 'phoenix',
+        'philadelphia', 'san antonio', 'dallas', 'austin', 'seattle', 'portland',
+        'boston', 'detroit', 'nashville', 'las vegas', 'atlanta', 'miami',
+        'remote us', 'remote usa', 'us remote', 'usa remote', 'united states remote'
+    ]
+    
+    # 如果包含美国关键词，返回False
+    for keyword in us_keywords:
+        if keyword in location_lower:
+            return False
+    
+    return False
+
+
 async def save_job_to_api(job_data: Dict[str, Any], source: str) -> bool:
     """保存职位到API"""
     try:
+        # 检查URL是否是澳大利亚的（seek.com.au）
+        url = job_data.get('url', '')
+        if 'seek.com.au' in url:
+            print(f"⏭ 跳过澳大利亚职位（URL）: {url}")
+            return False
+        
+        # 检查location是否在新西兰
+        location = job_data.get('location', '')
+        if not is_nz_location(location):
+            print(f"⏭ 跳过非新西兰职位（Location: {location}）: {url}")
+            return False
+        
         # 确定来源
-        if 'linkedin.com' in job_data.get('url', ''):
+        if 'linkedin.com' in url:
             source = 'linkedin'
-        elif 'seek.com' in job_data.get('url', '') or 'seek.com.au' in job_data.get('url', ''):
+        elif 'seek.co.nz' in url:
             source = 'seek'
         
         # 准备数据
+        # 如果 company 为空或 "Unknown"，则使用 None（不设置该字段）
+        company_guess = job_data.get('company', '').strip()
+        if not company_guess or company_guess.lower() == 'unknown':
+            company_guess = None
+        
         payload = {
             "source": source,
             "url": job_data.get('url', ''),
             "page_title": job_data.get('page_title', job_data.get('title', '')),
-            "company_guess": job_data.get('company', 'Unknown'),
+            "company_guess": company_guess,
             "location_guess": job_data.get('location'),
             "extracted_text": job_data.get('jd_text', ''),
         }
@@ -281,7 +605,8 @@ async def save_job_to_api(job_data: Dict[str, Any], source: str) -> bool:
             
             if response.status_code == 201:
                 result = response.json()
-                print(f"✓ 成功保存: {job_data.get('title', 'Unknown')} at {job_data.get('company', 'Unknown')}")
+                company_display = company_guess or "未知公司"
+                print(f"✓ 成功保存: {job_data.get('title', 'Unknown')} at {company_display}")
                 print(f"  职位ID: {result.get('job_id')}")
                 print(f"  提取了 {len(result.get('top_keywords', []))} 个关键词")
                 return True
@@ -299,7 +624,7 @@ async def save_job_to_api(job_data: Dict[str, Any], source: str) -> bool:
 
 async def search_seek_jobs(page: Page, keywords: str, max_results: int = 20, country: str = 'nz') -> list[str]:
     """
-    在Seek上搜索职位，返回职位URL列表
+    在Seek上搜索职位，返回职位URL列表（支持翻页）
     
     Args:
         page: Playwright页面对象
@@ -318,76 +643,124 @@ async def search_seek_jobs(page: Page, keywords: str, max_results: int = 20, cou
         print(f"正在搜索Seek ({country.upper()}): {keywords}")
         print(f"搜索URL: {search_url}")
         
-        await page.goto(search_url, wait_until="domcontentloaded", timeout=60000)
-        await page.wait_for_timeout(5000)  # 等待搜索结果加载（增加等待时间）
-        
         job_urls = []
+        page_num = 1
+        max_pages = 10  # 最多翻10页，避免无限循环
         
-        # 查找职位链接 - Seek的职位链接通常在a标签中，包含/job/
-        link_selectors = [
-            'a[data-automation="jobTitle"]',
-            'a[href*="/job/"]',
-            'article a[href*="/job/"]',
-            '[data-automation="jobTitle"]'
-        ]
-        
-        for selector in link_selectors:
-            try:
-                # 尝试查找元素（不强制等待，避免超时导致浏览器关闭）
+        while len(job_urls) < max_results and page_num <= max_pages:
+            # 构建当前页的URL
+            if page_num == 1:
+                current_url = search_url
+            else:
+                current_url = f"{search_url}&page={page_num}"
+            
+            print(f"正在抓取第 {page_num} 页...")
+            await page.goto(current_url, wait_until="domcontentloaded", timeout=60000)
+            await page.wait_for_timeout(5000)  # 等待搜索结果加载
+            
+            page_urls = []
+            
+            # 查找职位链接 - Seek的职位链接通常在a标签中，包含/job/
+            link_selectors = [
+                'a[data-automation="jobTitle"]',
+                'a[href*="/job/"]',
+                'article a[href*="/job/"]',
+                '[data-automation="jobTitle"]'
+            ]
+            
+            for selector in link_selectors:
                 try:
-                    await page.wait_for_selector(selector, timeout=3000)
-                except:
-                    pass  # 如果超时，继续尝试query_selector_all
-                    
-                links = await page.query_selector_all(selector)
-                print(f"使用选择器 {selector} 找到 {len(links)} 个链接")
-                
-                for link in links:
+                    # 尝试查找元素（不强制等待，避免超时导致浏览器关闭）
                     try:
-                        href = await link.get_attribute('href')
-                        if href and '/job/' in href:
-                            # 确保是完整URL
-                            if href.startswith('http'):
-                                full_url = href
-                            else:
-                                # 根据当前域名构建完整URL
-                                domain = 'seek.co.nz' if country == 'nz' else 'seek.com.au'
-                                full_url = f"https://www.{domain}{href}"
-                            
+                        await page.wait_for_selector(selector, timeout=3000)
+                    except:
+                        pass  # 如果超时，继续尝试query_selector_all
+                        
+                    links = await page.query_selector_all(selector)
+                    
+                    for link in links:
+                        try:
+                            href = await link.get_attribute('href')
+                            if href and '/job/' in href:
+                                # 确保是完整URL
+                                if href.startswith('http'):
+                                    full_url = href
+                                else:
+                                    # 根据当前域名构建完整URL
+                                    domain = 'seek.co.nz' if country == 'nz' else 'seek.com.au'
+                                    full_url = f"https://www.{domain}{href}"
+                                
                             # 清理URL（移除查询参数和锚点）
                             full_url = full_url.split('?')[0].split('#')[0]
                             
-                            if full_url not in job_urls:
-                                job_urls.append(full_url)
-                                if len(job_urls) >= max_results:
-                                    break
-                    except Exception as e:
-                        continue
-                
-                if job_urls:
-                    break
-            except Exception as e:
-                print(f"尝试选择器 {selector} 失败: {e}")
-                continue
-        
-        # 如果上面没找到，尝试从页面源码中提取
-        if not job_urls:
-            print("尝试从页面源码中提取链接...")
+                            # 只添加新西兰的URL（seek.co.nz），跳过澳大利亚（seek.com.au）
+                            if 'seek.co.nz' in full_url and full_url not in job_urls and full_url not in page_urls:
+                                page_urls.append(full_url)
+                            elif 'seek.com.au' in full_url:
+                                # 跳过澳大利亚的职位
+                                continue
+                        except Exception as e:
+                            continue
+                    
+                    if page_urls:
+                        break
+                except Exception as e:
+                    print(f"尝试选择器 {selector} 失败: {e}")
+                    continue
+            
+            # 如果上面没找到，尝试从页面源码中提取
+            if not page_urls:
+                print("尝试从页面源码中提取链接...")
+                try:
+                    content = await page.content()
+                    # 查找所有 /job/ 开头的链接
+                    matches = re.findall(r'href="(/job/\d+[^"]*)"', content)
+                    domain = 'seek.co.nz' if country == 'nz' else 'seek.com.au'
+                    for match in matches:
+                        full_url = f"https://www.{domain}{match.split('?')[0].split('#')[0]}"
+                        # 只添加新西兰的URL，跳过澳大利亚
+                        if 'seek.co.nz' in full_url and full_url not in job_urls and full_url not in page_urls:
+                            page_urls.append(full_url)
+                        elif 'seek.com.au' in full_url:
+                            # 跳过澳大利亚的职位
+                            continue
+                except Exception as e:
+                    print(f"从源码提取链接失败: {e}")
+            
+            if not page_urls:
+                print(f"第 {page_num} 页没有找到新职位，停止翻页")
+                break
+            
+            # 添加到总列表
+            job_urls.extend(page_urls)
+            print(f"第 {page_num} 页找到 {len(page_urls)} 个职位，累计 {len(job_urls)} 个")
+            
+            # 检查是否还需要继续翻页
+            if len(job_urls) >= max_results:
+                break
+            
+            # 检查是否有下一页按钮
             try:
-                content = await page.content()
-                # 查找所有 /job/ 开头的链接
-                matches = re.findall(r'href="(/job/\d+[^"]*)"', content)
-                domain = 'seek.co.nz' if country == 'nz' else 'seek.com.au'
-                for match in matches:
-                    full_url = f"https://www.{domain}{match.split('?')[0].split('#')[0]}"
-                    if full_url not in job_urls:
-                        job_urls.append(full_url)
-                        if len(job_urls) >= max_results:
-                            break
-            except Exception as e:
-                print(f"从源码提取链接失败: {e}")
+                next_button = await page.query_selector('a[data-automation="pagination-next-button"]')
+                if not next_button:
+                    # 尝试其他可能的下页按钮选择器
+                    next_button = await page.query_selector('a[aria-label*="Next"]')
+                if not next_button:
+                    # 检查是否已经是最后一页
+                    disabled_next = await page.query_selector('a[data-automation="pagination-next-button"][aria-disabled="true"]')
+                    if disabled_next:
+                        print("已到达最后一页")
+                        break
+                if not next_button:
+                    print("未找到下一页按钮，停止翻页")
+                    break
+            except:
+                pass
+            
+            page_num += 1
+            await asyncio.sleep(2)  # 翻页之间等待，避免请求过快
         
-        print(f"找到 {len(job_urls)} 个职位链接")
+        print(f"总共找到 {len(job_urls)} 个职位链接")
         return job_urls[:max_results]
         
     except Exception as e:

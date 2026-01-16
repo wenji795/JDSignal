@@ -11,15 +11,12 @@ export default function JobsPage() {
   const [error, setError] = useState<string | null>(null)
   const [filters, setFilters] = useState({
     role_family: '',
-    seniority: '',
-    location: '' // 默认显示所有职位，用户可以手动选择过滤
+    seniority: ''
   })
 
   const roleFamilies = [
     'testing',  // 软件测试（用户最关心）
     'ai',       // AI/机器学习
-    'backend', 
-    'frontend', 
     'fullstack', 
     'devops', 
     'data',
@@ -30,8 +27,6 @@ export default function JobsPage() {
   const roleFamilyLabels: Record<string, string> = {
     'testing': '软件测试',
     'ai': 'AI/机器学习',
-    'backend': '后端',
-    'frontend': '前端',
     'fullstack': '全栈',
     'devops': 'DevOps',
     'data': '数据',
@@ -42,6 +37,15 @@ export default function JobsPage() {
   useEffect(() => {
     loadJobs()
   }, [filters])
+  
+  // 每30秒自动刷新一次职位列表
+  useEffect(() => {
+    const interval = setInterval(() => {
+      loadJobs()
+    }, 30000) // 30秒
+    
+    return () => clearInterval(interval)
+  }, [filters])
 
   const loadJobs = async () => {
     try {
@@ -50,7 +54,6 @@ export default function JobsPage() {
       const params: {
         role_family?: string;
         seniority?: string;
-        location?: string;
       } = {}
       
       if (filters.role_family && filters.role_family.trim()) {
@@ -58,9 +61,6 @@ export default function JobsPage() {
       }
       if (filters.seniority && filters.seniority.trim()) {
         params.seniority = filters.seniority
-      }
-      if (filters.location && filters.location.trim()) {
-        params.location = filters.location
       }
       
       const data = await getJobs(params)
@@ -100,7 +100,16 @@ export default function JobsPage() {
 
   return (
     <div>
-      <h1 className="text-3xl font-bold mb-6">职位列表</h1>
+      <div className="flex justify-between items-center mb-6">
+        <h1 className="text-3xl font-bold">职位列表</h1>
+        <button
+          onClick={() => loadJobs()}
+          disabled={loading}
+          className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 disabled:bg-gray-400"
+        >
+          {loading ? '刷新中...' : '刷新'}
+        </button>
+      </div>
       
       {/* 过滤器 */}
       <div className="bg-gray-50 p-4 rounded-lg mb-6 flex gap-4 items-end">
@@ -132,24 +141,8 @@ export default function JobsPage() {
           </select>
         </div>
         
-        <div className="flex-1">
-          <label className="block text-sm font-medium mb-1">地点</label>
-          <select
-            value={filters.location}
-            onChange={(e) => setFilters({ ...filters, location: e.target.value })}
-            className="w-full p-2 border rounded"
-          >
-            <option value="">全部</option>
-            <option value="Auckland">奥克兰</option>
-            <option value="Wellington">惠灵顿</option>
-            <option value="Christchurch">基督城</option>
-            <option value="Sydney">悉尼</option>
-            <option value="Brisbane">布里斯班</option>
-          </select>
-        </div>
-        
         <button
-          onClick={() => setFilters({ role_family: '', seniority: '', location: '' })}
+          onClick={() => setFilters({ role_family: '', seniority: '' })}
           className="px-4 py-2 bg-gray-200 rounded hover:bg-gray-300"
         >
           重置
@@ -171,7 +164,12 @@ export default function JobsPage() {
                 <div className="flex-1">
                   <h2 className="text-xl font-semibold mb-2">{job.title}</h2>
                   <div className="flex gap-4 text-sm text-gray-600 mb-2">
-                    <span>{job.company}</span>
+                    {job.company && job.company.trim() && job.company.toLowerCase() !== 'unknown' ? (
+                      <span>{job.company}</span>
+                    ) : null}
+                    {job.posted_date ? (
+                      <span>📅 {new Date(job.posted_date).toLocaleDateString()}</span>
+                    ) : null}
                     {job.location && <span>📍 {job.location}</span>}
                   </div>
                   <div className="flex gap-2 flex-wrap">

@@ -98,14 +98,19 @@ def get_trends(
     
     top_keywords = [{"term": term, "count": count} for term, count in keyword_counter.most_common(30)]
     
-    # 6. 按角色族统计top关键词（每个角色族top 10）
+    # 6. 按角色族统计top关键词（每个角色族top 20）
     top_keywords_by_role_family = {}
     for role_fam, counter in keyword_by_role_family.items():
         top_keywords_by_role_family[role_fam] = [
-            {"term": term, "count": count} for term, count in counter.most_common(10)
+            {"term": term, "count": count} for term, count in counter.most_common(20)
         ]
     
-    # 7. 关键词增长分析（比较前半段和后半段）
+    # 7. 如果指定了role_family筛选，返回该角色族的top20关键词
+    selected_role_family_top_keywords = None
+    if role_family and role_family in top_keywords_by_role_family:
+        selected_role_family_top_keywords = top_keywords_by_role_family[role_family]
+    
+    # 8. 关键词增长分析（比较前半段和后半段）
     keyword_growth = {}
     if len(jobs) > 1:
         # 按captured_at排序
@@ -154,7 +159,7 @@ def get_trends(
                 "percent_change": round(percent_change, 2)
             }
     
-    return {
+    result = {
         "total_jobs": total_jobs,
         "count_by_role_family": dict(count_by_role_family),
         "count_by_seniority": dict(count_by_seniority),
@@ -162,3 +167,9 @@ def get_trends(
         "top_keywords_by_role_family": top_keywords_by_role_family,
         "keyword_growth": keyword_growth
     }
+    
+    # 如果指定了role_family筛选，添加该角色族的top20关键词
+    if selected_role_family_top_keywords is not None:
+        result["selected_role_family_top_keywords"] = selected_role_family_top_keywords
+    
+    return result

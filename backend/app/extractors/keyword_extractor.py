@@ -47,11 +47,15 @@ MUST_HAVE_INDICATORS = [
     r'\bqualifications?\b', r'\bneeded\b', r'\bnecessary\b'
 ]
 
-# Nice-to-have指示词
+# Nice-to-have指示词（增强版，包括更多表达方式）
 NICE_TO_HAVE_INDICATORS = [
     r'\bnice\s+to\s+have\b', r'\bpreferred\b', r'\bbonus\b',
     r'\bdesirable\b', r'\badvantage\b', r'\bplus\b',
-    r'\bwould\s+be\s+great\b', r'\boptional\b'
+    r'\bwould\s+be\s+great\b', r'\boptional\b',
+    r'\bbonus\s+experience\b', r'\bbonus\s+skills?\b',
+    r'\bwould\s+be\s+advantageous\b', r'\bwould\s+be\s+an\s+advantage\b',
+    r'\bhowever\s+knowledge\s+of\b',  # "however knowledge of X would be advantageous"
+    r'\badvantageous\b', r'\bpreferred\s+but\s+not\s+required\b'
 ]
 
 
@@ -87,7 +91,18 @@ def create_skill_mapping(skill_dict: Dict) -> Tuple[Dict[str, str], Dict[str, Di
 def find_keyword_positions(text: str, keyword: str) -> List[Tuple[int, int]]:
     """找到关键词在文本中的所有位置（字符位置）"""
     positions = []
-    pattern = r'\b' + re.escape(keyword) + r'\b'
+    # 对于包含特殊字符的关键词（如C#），需要特殊处理
+    escaped_keyword = re.escape(keyword)
+    
+    # 如果关键词包含非字母数字字符（如#、.、+等），使用更灵活的匹配
+    if re.search(r'[^a-zA-Z0-9]', keyword):
+        # 对于特殊字符，使用更宽松的边界匹配
+        # 例如：C# 可以匹配 "C#", "C# ", " C#", "C#," 等
+        pattern = r'(?<![a-zA-Z0-9])' + escaped_keyword + r'(?![a-zA-Z0-9])'
+    else:
+        # 对于普通关键词，使用单词边界
+        pattern = r'\b' + escaped_keyword + r'\b'
+    
     for match in re.finditer(pattern, text, re.IGNORECASE):
         positions.append((match.start(), match.end()))
     return positions
@@ -102,6 +117,142 @@ def is_in_section(text: str, position: int, indicators: List[str], window: int =
     for indicator in indicators:
         if re.search(indicator, section, re.IGNORECASE):
             return True
+    return False
+
+
+def is_in_tech_stack_section(text: str, position: int, window: int = 500) -> bool:
+    """
+    检查位置是否在tech stack区域
+    例如："Our tech stack: C#, Reqnroll, Postman, JavaScript, k6, JMeter and Azure."
+    """
+    start = max(0, position - window)
+    section_before = text[start:position].lower()
+    
+    # 检查是否在"tech stack"、"technology stack"、"tech"等区域
+    tech_stack_patterns = [
+        r'tech\s+stack[:：]',
+        r'technology\s+stack[:：]',
+        r'our\s+tech\s+stack[:：]',
+        r'our\s+technology\s+stack[:：]',
+        r'tech[:：]',
+        r'technologies[:：]',
+        r'stack[:：]'
+    ]
+    
+    for pattern in tech_stack_patterns:
+        if re.search(pattern, section_before, re.IGNORECASE):
+            # 检查是否在"Bonus experience"之前
+            remaining_text = text[start:position].lower()
+            if not re.search(r'bonus\s+(?:experience|skills?)[:：]', remaining_text, re.IGNORECASE):
+                return True
+    
+    return False
+
+
+def is_in_main_skills_section(text: str, position: int, window: int = 1000) -> bool:
+    """
+    检查位置是否在主要技能区域（如"Skills and Tools"）
+    如果在主要技能区域，即使有"however...would be advantageous"，也应该归类为must-have
+    注意：如果已经在"Bonus experience"区域，则不应该返回True
+    """
+    # 首先检查是否在"Bonus experience"区域，如果是，则不是主要技能区域
+    if is_in_bonus_experience_section(text, position):
+        return False
+    
+    start = max(0, position - window)
+    section_before = text[start:position].lower()
+    
+    # 检查是否在"Skills and Tools"、"Skills"、"Requirements"等主要技能区域
+    main_skills_patterns = [
+        r'skills?\s+and\s+tools?[:：]',
+        r'skills?[:：]',
+        r'requirements?[:：]',
+        r'qualifications?[:：]',
+        r'experience\s+and\s+other\s+requirements?[:：]',
+        r'technical\s+skills?[:：]',
+        r'core\s+skills?[:：]',
+        r'essential\s+skills?[:：]'
+    ]
+    
+    for pattern in main_skills_patterns:
+        matches = list(re.finditer(pattern, section_before, re.IGNORECASE))
+        if matches:
+            # 找到最近的匹配
+            last_match = matches[-1]
+            # 检查是否在"Bonus experience"之前（如果在Bonus之后，就不是主要技能区域）
+            remaining_text = text[start + last_match.end():position].lower()
+            if not re.search(r'bonus\s+(?:experience|skills?)[:：]', remaining_text, re.IGNORECASE):
+                return True
+    
+    return False
+
+
+def is_in_bonus_experience_section(text: str, position: int, window: int = 2000) -> bool:
+    """
+    检查位置是否在"Bonus experience"区域
+    这是最明确的nice-to-have区域
+    """
+    start = max(0, position - window)
+    before_text = text[start:position].lower()
+    
+    # 查找最近的"Bonus experience:"或"Bonus:"标题
+    bonus_patterns = [
+        r'bonus\s+experience[:：]',
+        r'bonus\s+skills?[:：]',
+        r'bonus[:：]'
+    ]
+    
+    for pattern in bonus_patterns:
+        matches = list(re.finditer(pattern, before_text, re.IGNORECASE))
+        if matches:
+            # 找到最近的匹配
+            last_match = matches[-1]
+            bonus_pos = start + last_match.end()
+            # 检查是否在"Bonus"之后，且距离不太远
+            if position - bonus_pos < 1000:  # 在1000字符内
+                # 检查是否在下一个主要章节之前（如"Requirements"、"Skills"等）
+                remaining_text = text[bonus_pos:min(len(text), bonus_pos + 2000)].lower()
+                next_section_match = re.search(r'^(?:skills?|requirements?|qualifications?|experience\s+and\s+other)[:：]', remaining_text, re.MULTILINE | re.IGNORECASE)
+                if not next_section_match or position < bonus_pos + next_section_match.start():
+                    return True
+    
+    return False
+
+
+def check_contextual_nice_to_have(text: str, position: int, keyword: str, window: int = 300) -> bool:
+    """
+    检查关键词是否在明确的nice-to-have上下文中
+    例如："however knowledge of Selenium would be advantageous"
+    """
+    # 首先检查是否在"Bonus experience"区域（最明确的nice-to-have区域）
+    if is_in_bonus_experience_section(text, position):
+        return True
+    
+    # 检查是否在主要技能区域
+    if is_in_main_skills_section(text, position):
+        # 如果在主要技能区域，即使有"however...would be advantageous"，也应该是must-have
+        return False
+    
+    start = max(0, position - window)
+    end = min(len(text), position + window)
+    section = text[start:end]
+    section_lower = section.lower()
+    keyword_lower = keyword.lower()
+    
+    # 检查"however...would be advantageous"模式
+    # 匹配: "however knowledge of [keyword] would be advantageous"
+    pattern1 = r'however\s+[^.]*?' + re.escape(keyword_lower) + r'[^.]*?(?:would\s+be\s+advantageous|would\s+be\s+an\s+advantage|advantageous)'
+    if re.search(pattern1, section_lower, re.IGNORECASE):
+        return True
+    
+    # 检查"however...knowledge of [keyword]"模式（通常后面跟着advantageous）
+    pattern2 = r'however\s+[^.]*?knowledge\s+of\s+[^.]*?' + re.escape(keyword_lower)
+    if re.search(pattern2, section_lower, re.IGNORECASE):
+        # 检查后面是否有advantageous相关词汇
+        remaining_text = text[position:min(len(text), position + 200)].lower()
+        if re.search(r'would\s+be\s+advantageous|would\s+be\s+an\s+advantage|advantageous', remaining_text, re.IGNORECASE):
+            return True
+    
     return False
 
 
@@ -206,23 +357,70 @@ def extract_keywords(jd_text: str) -> Dict:
             nice_to_have_bonus = 0.0
             heading_bonus = 0.0
             title_bonus = 0.0  # 标题中的关键词权重更高
+            tech_stack_bonus = 0.0  # tech stack区域的权重
             
             # 检查是否在标题中（前200字符）
             title_text = jd_text[:200].lower()
             if alias.lower() in title_text or canonical.lower() in title_text:
                 title_bonus = 3.0  # 标题中的关键词权重很高
             
+            # 收集所有位置的上下文信息，用于最终分类决策
+            has_bonus_experience_context = False
+            has_skills_tools_context = False
+            has_tech_stack_context = False
+            has_nice_to_have_indicator = False
+            has_must_have_indicator = False
+            
             for pos, _ in positions:
-                if is_in_section(jd_text, pos, MUST_HAVE_INDICATORS):
-                    must_have_bonus += 3.0  # must-have区域权重更高
-                    must_have_terms.add(canonical)
+                # 检查是否在tech stack区域（给予很高权重）
+                if is_in_tech_stack_section(jd_text, pos):
+                    tech_stack_bonus += 5.0  # tech stack区域的技能权重非常高
+                    has_tech_stack_context = True
                 
-                if is_in_section(jd_text, pos, NICE_TO_HAVE_INDICATORS):
+                # 检查是否在"Bonus experience"区域（优先级最高，明确标注为nice-to-have）
+                if is_in_bonus_experience_section(jd_text, pos):
+                    has_bonus_experience_context = True
+                    nice_to_have_bonus += 2.0
+                elif check_contextual_nice_to_have(jd_text, pos, alias):
+                    # 检查其他nice-to-have上下文（如"however...would be advantageous"）
+                    has_nice_to_have_indicator = True
                     nice_to_have_bonus += 1.5
-                    nice_to_have_terms.add(canonical)
+                
+                # 检查是否在主要技能区域（"Skills and Tools"等）
+                # 注意：如果已经在"Bonus experience"区域，is_in_main_skills_section会返回False
+                if is_in_main_skills_section(jd_text, pos):
+                    has_skills_tools_context = True
+                    must_have_bonus += 3.0
+                
+                # 检查明确的nice-to-have指示词（仅在不在主要技能区域时）
+                if not has_skills_tools_context and is_in_section(jd_text, pos, NICE_TO_HAVE_INDICATORS):
+                    has_nice_to_have_indicator = True
+                    nice_to_have_bonus += 1.5
+                
+                # 检查must-have指示词
+                if is_in_section(jd_text, pos, MUST_HAVE_INDICATORS):
+                    has_must_have_indicator = True
+                    must_have_bonus += 3.0
                 
                 if is_in_heading_or_bullet(jd_text, pos):
                     heading_bonus += 2.0  # 标题或列表项中的关键词权重更高
+            
+            # 根据优先级规则决定最终分类（避免重复）
+            # 优先级：Bonus experience > Skills and Tools/Tech Stack > 其他指示词
+            # 重要：每个关键词只能出现在一个列表中，使用if-elif确保互斥
+            if has_bonus_experience_context:
+                # 明确在"Bonus experience"区域，归类为nice-to-have（最高优先级）
+                nice_to_have_terms.add(canonical)
+            elif has_skills_tools_context or has_tech_stack_context:
+                # 在"Skills and Tools"或"Tech Stack"区域，归类为must-have
+                must_have_terms.add(canonical)
+            elif has_nice_to_have_indicator and not has_must_have_indicator:
+                # 有nice-to-have指示词，且没有must-have指示词，归类为nice-to-have
+                nice_to_have_terms.add(canonical)
+            elif has_must_have_indicator:
+                # 有must-have指示词，归类为must-have
+                must_have_terms.add(canonical)
+            # 如果都没有明确的上下文，默认不添加到任何列表（让动态提取器处理）
             
             # 根据类别调整权重（类似ATS系统）
             category_weights = {
@@ -247,7 +445,8 @@ def extract_keywords(jd_text: str) -> Dict:
                 must_have_bonus +                # must-have奖励
                 nice_to_have_bonus +            # nice-to-have奖励
                 heading_bonus +                 # 标题/列表奖励
-                title_bonus                     # 标题奖励
+                title_bonus +                   # 标题奖励
+                tech_stack_bonus                # tech stack奖励（权重最高）
             )
             
             # 更新或添加关键词
@@ -298,6 +497,27 @@ def extract_keywords(jd_text: str) -> Dict:
     years_required = extract_years_required(jd_text)
     degree_required = extract_degree_required(jd_text)
     certifications = extract_certifications(jd_text)
+    
+    # 确保must-have和nice-to-have不重复（双重保险）
+    # 如果一个关键词同时出现在两个集合中：
+    # 1. 如果它在"Bonus experience"区域出现，优先保留nice-to-have
+    # 2. 否则，优先保留must-have
+    # 但理论上不应该出现这种情况，因为上面的if-elif逻辑已经确保互斥
+    # 这里作为最后的保险措施
+    intersection = must_have_terms & nice_to_have_terms
+    if intersection:
+        # 检查这些重复的关键词，看它们是否在"Bonus experience"区域
+        for term in intersection:
+            # 如果这个关键词在"Bonus experience"区域出现，从must-have中移除
+            term_positions = find_keyword_positions(jd_text, term)
+            has_bonus = any(is_in_bonus_experience_section(jd_text, pos) for pos, _ in term_positions)
+            if has_bonus:
+                must_have_terms.discard(term)
+            else:
+                nice_to_have_terms.discard(term)
+    
+    # 最终确保没有重复
+    nice_to_have_terms = nice_to_have_terms - must_have_terms
     
     return {
         "keywords": keywords,
