@@ -49,7 +49,8 @@ def extract_camel_case_terms(text: str) -> Set[str]:
 COMMON_ACRONYMS_TO_FILTER = {
     'SEEK', 'NZ', 'CBD', 'AU', 'US', 'USA', 'UK', 'EU',
     'EOE', 'EEO', 'WFH', 'HR', 'CEO', 'CTO', 'CFO',
-    'WWW', 'HTTP', 'HTTPS', 'URL', 'URI', 'HTML', 'CSS'
+    'WWW', 'HTTP', 'HTTPS', 'URL', 'URI', 'HTML', 'CSS',
+    'IT'  # IT是通用行业术语，对分析没有价值
 }
 
 def extract_acronyms(text: str) -> Set[str]:
@@ -115,7 +116,8 @@ def extract_acronyms(text: str) -> Set[str]:
         'SEEK', 'NZ', 'CBD', 'AU', 'US', 'USA', 'UK', 'EU', 'NZL',
         'EOE', 'EEO', 'WFH', 'HR', 'CEO', 'CTO', 'CFO', 'VP', 'GM',
         'WWW', 'URL', 'URI', 'HTTP', 'HTTPS',  # HTTP/HTTPS保留在tech_acronyms中，但这里过滤
-        'AUC', 'WLG', 'CHC', 'HAM', 'DUN', 'TAU'  # 新西兰城市缩写
+        'AUC', 'WLG', 'CHC', 'HAM', 'DUN', 'TAU',  # 新西兰城市缩写
+        'IT'  # IT是通用行业术语，对分析没有价值
     }
     
     for match in matches:

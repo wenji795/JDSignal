@@ -74,6 +74,8 @@ COMMON_KEYWORDS_TO_FILTER = {
     'skill', 'skills', 'ability', 'abilities', 'capability', 'capabilities',
     # 团队和工作
     'team', 'teams', 'work', 'working', 'workplace', 'workplace', 'workforce',
+    # 通用行业术语
+    'it', 'information technology',  # IT是通用术语，对分析没有价值
     # 国家相关
     'australia', 'au', 'us', 'usa', 'united states', 'america',
     # 地点相关
@@ -612,7 +614,7 @@ def extract_keywords(jd_text: str) -> Dict:
             if term_lower not in tech_short_acronyms:
                 # 如果不在技术缩写白名单中，且是常见的地理/通用缩写，则过滤
                 common_short = {'nz', 'au', 'us', 'uk', 'eu', 'cbd', 'hr', 'ceo', 'cto', 'cfo', 
-                               'wfh', 'eoe', 'eeo', 'www', 'akl', 'wlg', 'chc', 'ham', 'dun', 'tau'}
+                               'wfh', 'eoe', 'eeo', 'www', 'akl', 'wlg', 'chc', 'ham', 'dun', 'tau', 'it'}
                 if term_lower in common_short:
                     return True
         

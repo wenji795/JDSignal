@@ -28,6 +28,7 @@ COMMON_KEYWORDS_TO_FILTER = {
     'qualify', 'qualified', 'qualifying',
     'skill', 'skills', 'ability', 'abilities', 'capability', 'capabilities',
     'team', 'teams', 'work', 'working', 'workplace', 'workforce',
+    'it', 'information technology',  # IT是通用术语，对分析没有价值
     'australia', 'au', 'us', 'usa', 'united states', 'america',
     'location', 'locations', 'area', 'areas', 'region', 'regions', 'city', 'cities',
     'description', 'about', 'overview', 'summary', 'detail', 'details',
@@ -62,7 +63,7 @@ def should_filter_keyword(term: str) -> bool:
                                'tdd', 'bdd', 'ddd', 'k8s', 'pdf', 'csv', 'tsv', 'yaml'}
         if term_lower not in tech_short_acronyms:
             common_short = {'nz', 'au', 'us', 'uk', 'eu', 'cbd', 'hr', 'ceo', 'cto', 'cfo',
-                           'wfh', 'eoe', 'eeo', 'www', 'akl', 'wlg', 'chc', 'ham', 'dun', 'tau'}
+                           'wfh', 'eoe', 'eeo', 'www', 'akl', 'wlg', 'chc', 'ham', 'dun', 'tau', 'it'}
             if term_lower in common_short:
                 return True
     
