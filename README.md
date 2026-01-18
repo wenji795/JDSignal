@@ -234,7 +234,8 @@ JDSignal/
 │   │   ├── export_csv.py    # CSV导出
 │   │   ├── export_jsonl.py  # JSONL导出
 │   │   ├── re_extract_keywords.py  # 重新提取关键词脚本
-│   │   └── clean_non_nz_jobs.py    # 清理非新西兰职位脚本
+│   │   ├── clean_non_nz_jobs.py    # 清理非新西兰职位脚本
+│   │   └── clean_old_jobs.py       # 清理6个月前的数据脚本
 │   ├── tests/               # 测试代码
 │   ├── jobs.db             # SQLite数据库（自动创建）
 │   └── requirements.txt    # Python依赖
@@ -275,8 +276,18 @@ JDSignal/
 
 定时任务配置在 `backend/app/services/scheduler_service.py` 中：
 
-- 默认每小时整点执行一次
+- **每小时整点**：自动抓取最新职位
+- **每天凌晨2点**：自动清理6个月前的数据（减小数据库压力）
 - 可通过修改 `CronTrigger` 调整执行频率
+
+### 数据保留策略
+
+系统默认只保留最近6个月的数据，以减小数据库压力：
+
+- 每天凌晨2点自动清理6个月前的数据
+- 可以手动运行清理脚本：`python scripts/clean_old_jobs.py --delete`
+- 预览模式（不实际删除）：`python scripts/clean_old_jobs.py`
+- 自定义保留月数：`python scripts/clean_old_jobs.py --months 3 --delete`
 
 ## 📊 数据导出
 

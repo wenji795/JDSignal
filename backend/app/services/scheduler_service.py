@@ -29,6 +29,47 @@ async def run_scraper():
         traceback.print_exc()
 
 
+async def clean_old_data():
+    """清理6个月前的数据"""
+    try:
+        from datetime import datetime, timedelta
+        from sqlmodel import Session, select
+        from app.database import engine
+        from app.models import Job, Extraction
+        
+        cutoff_date = datetime.utcnow() - timedelta(days=180)  # 6个月
+        
+        with Session(engine) as session:
+            # 查找需要删除的职位
+            old_jobs_query = select(Job).where(Job.captured_at < cutoff_date)
+            old_jobs = session.exec(old_jobs_query).all()
+            
+            if not old_jobs:
+                print("✓ 数据清理：没有需要清理的旧数据")
+                return
+            
+            deleted_count = 0
+            for job in old_jobs:
+                # 删除关联的Extraction
+                extraction = session.exec(
+                    select(Extraction).where(Extraction.job_id == job.id)
+                ).first()
+                if extraction:
+                    session.delete(extraction)
+                
+                # 删除Job
+                session.delete(job)
+                deleted_count += 1
+            
+            session.commit()
+            print(f"✓ 数据清理：已删除 {deleted_count} 个6个月前的职位")
+            
+    except Exception as e:
+        print(f"✗ 数据清理任务执行失败: {e}")
+        import traceback
+        traceback.print_exc()
+
+
 def start_scheduler():
     """启动定时任务调度器"""
     global scheduler
@@ -50,9 +91,20 @@ def start_scheduler():
         replace_existing=True
     )
     
+    # 每天凌晨2点执行数据清理（清理6个月前的数据）
+    scheduler.add_job(
+        clean_old_data,
+        trigger=CronTrigger(hour=2, minute=0),  # 每天凌晨2点执行
+        id='daily_cleanup',
+        name='每天清理6个月前的数据',
+        max_instances=1,
+        replace_existing=True
+    )
+    
     scheduler.start()
     print("✓ 定时任务调度器已启动")
     print("  - 每小时自动抓取新西兰职位（每小时的第0分钟）")
+    print("  - 每天自动清理6个月前的数据（每天凌晨2点）")
 
 
 def stop_scheduler():
