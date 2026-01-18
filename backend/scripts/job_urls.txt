@@ -1,12 +1,9 @@
 # 请在此文件中添加要抓取的职位URL
 # 每行一个URL
-# 支持LinkedIn和Seek
-
-# LinkedIn示例（请替换为真实URL）：
-# https://www.linkedin.com/jobs/view/1234567890
+# 仅支持Seek NZ
 
 # Seek示例（请替换为真实URL）：
-# https://www.seek.com.au/job/12345678
+# https://www.seek.co.nz/job/12345678
 
 # 或者你可以直接在命令行运行：
-# python3 scripts/scrape_jobs.py "https://www.linkedin.com/jobs/view/YOUR_JOB_ID"
+# python3 scripts/scrape_jobs.py "https://www.seek.co.nz/job/YOUR_JOB_ID"

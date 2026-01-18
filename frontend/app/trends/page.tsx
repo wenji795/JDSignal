@@ -329,6 +329,132 @@ export default function TrendsPage() {
         </div>
       )}
 
+      {/* 上月vs本月关键词比较 - 总体Top 7 */}
+      {trends.monthly_comparison && trends.monthly_comparison.comparison.length > 0 && (
+        <div className="bg-white rounded-lg shadow p-6 mb-6">
+          <h2 className="text-xl font-semibold mb-4">上月 vs 本月关键词对比（总体 Top 7）</h2>
+          <div className="mb-4 text-sm text-gray-600">
+            <p>
+              本月 ({new Date(trends.monthly_comparison.current_month.start).toLocaleDateString('zh-CN', { year: 'numeric', month: 'long' })}): 
+              <span className="font-semibold ml-1">{trends.monthly_comparison.current_month.job_count}</span> 个职位
+            </p>
+            <p>
+              上月 ({new Date(trends.monthly_comparison.last_month.start).toLocaleDateString('zh-CN', { year: 'numeric', month: 'long' })}): 
+              <span className="font-semibold ml-1">{trends.monthly_comparison.last_month.job_count}</span> 个职位
+            </p>
+          </div>
+          <div className="overflow-x-auto">
+            <table className="min-w-full divide-y divide-gray-200">
+              <thead className="bg-gray-50">
+                <tr>
+                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">关键词</th>
+                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">上月</th>
+                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">本月</th>
+                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">变化</th>
+                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">变化率</th>
+                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">状态</th>
+                </tr>
+              </thead>
+              <tbody className="bg-white divide-y divide-gray-200">
+                {trends.monthly_comparison.comparison.map((item, idx) => {
+                  const statusColors = {
+                    'new': 'bg-green-100 text-green-800',
+                    'increased': 'bg-blue-100 text-blue-800',
+                    'decreased': 'bg-red-100 text-red-800',
+                    'unchanged': 'bg-gray-100 text-gray-800'
+                  }
+                  const statusLabels = {
+                    'new': '新增',
+                    'increased': '增长',
+                    'decreased': '下降',
+                    'unchanged': '不变'
+                  }
+                  return (
+                    <tr key={idx} className="hover:bg-gray-50">
+                      <td className="px-4 py-3 whitespace-nowrap text-sm font-medium text-gray-900">{item.term}</td>
+                      <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-500">{item.last_month_count}</td>
+                      <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-900 font-semibold">{item.current_month_count}</td>
+                      <td className={`px-4 py-3 whitespace-nowrap text-sm font-semibold ${item.delta > 0 ? 'text-green-600' : item.delta < 0 ? 'text-red-600' : 'text-gray-600'}`}>
+                        {item.delta > 0 ? '+' : ''}{item.delta}
+                      </td>
+                      <td className={`px-4 py-3 whitespace-nowrap text-sm ${item.percent_change > 0 ? 'text-green-600' : item.percent_change < 0 ? 'text-red-600' : 'text-gray-600'}`}>
+                        {item.percent_change > 0 ? '+' : ''}{item.percent_change.toFixed(1)}%
+                      </td>
+                      <td className="px-4 py-3 whitespace-nowrap">
+                        <span className={`px-2 py-1 text-xs font-medium rounded-full ${statusColors[item.status]}`}>
+                          {statusLabels[item.status]}
+                        </span>
+                      </td>
+                    </tr>
+                  )
+                })}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
+
+      {/* 按角色族的月度对比 - 每个角色族Top 5 */}
+      {trends.monthly_comparison && trends.monthly_comparison.by_role_family && Object.keys(trends.monthly_comparison.by_role_family).length > 0 && (
+        <div className="bg-white rounded-lg shadow p-6 mb-6">
+          <h2 className="text-xl font-semibold mb-4">各角色族上月 vs 本月关键词对比（Top 5）</h2>
+          <div className="grid md:grid-cols-2 gap-6">
+            {Object.entries(trends.monthly_comparison.by_role_family).map(([roleFamily, comparisons]) => {
+              if (comparisons.length === 0) return null
+              
+              return (
+                <div key={roleFamily} className="border rounded-lg p-4">
+                  <h3 className="font-semibold mb-3 text-lg" style={{ color: getRoleFamilyColor(roleFamily) }}>
+                    {roleFamilyLabels[roleFamily] || roleFamily}
+                  </h3>
+                  <div className="overflow-x-auto">
+                    <table className="min-w-full divide-y divide-gray-200">
+                      <thead className="bg-gray-50">
+                        <tr>
+                          <th className="px-2 py-2 text-left text-xs font-medium text-gray-500 uppercase">关键词</th>
+                          <th className="px-2 py-2 text-left text-xs font-medium text-gray-500 uppercase">上月</th>
+                          <th className="px-2 py-2 text-left text-xs font-medium text-gray-500 uppercase">本月</th>
+                          <th className="px-2 py-2 text-left text-xs font-medium text-gray-500 uppercase">变化</th>
+                        </tr>
+                      </thead>
+                      <tbody className="bg-white divide-y divide-gray-200">
+                        {comparisons.map((item, idx) => {
+                          const statusColors = {
+                            'new': 'bg-green-100 text-green-800',
+                            'increased': 'bg-blue-100 text-blue-800',
+                            'decreased': 'bg-red-100 text-red-800',
+                            'unchanged': 'bg-gray-100 text-gray-800'
+                          }
+                          const statusLabels = {
+                            'new': '新增',
+                            'increased': '增长',
+                            'decreased': '下降',
+                            'unchanged': '不变'
+                          }
+                          return (
+                            <tr key={idx} className="hover:bg-gray-50">
+                              <td className="px-2 py-2 whitespace-nowrap text-sm font-medium text-gray-900">{item.term}</td>
+                              <td className="px-2 py-2 whitespace-nowrap text-sm text-gray-500">{item.last_month_count}</td>
+                              <td className="px-2 py-2 whitespace-nowrap text-sm text-gray-900 font-semibold">{item.current_month_count}</td>
+                              <td className={`px-2 py-2 whitespace-nowrap text-sm font-semibold ${item.delta > 0 ? 'text-green-600' : item.delta < 0 ? 'text-red-600' : 'text-gray-600'}`}>
+                                {item.delta > 0 ? '+' : ''}{item.delta}
+                                <span className={`ml-2 px-1.5 py-0.5 text-xs rounded-full ${statusColors[item.status]}`}>
+                                  {statusLabels[item.status]}
+                                </span>
+                              </td>
+                            </tr>
+                          )
+                        })}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              )
+            })}
+          </div>
+        </div>
+      )}
+
       {/* 文本列表：角色族关键词 */}
       {Object.keys(trends.top_keywords_by_role_family).length > 0 && (
         <div className="bg-white rounded-lg shadow p-6">

@@ -1,13 +1,20 @@
 # JDSignal - 新西兰IT职位市场分析与关键词提取系统
 
-一个智能化的职位描述（JD）追踪和分析系统，专注于新西兰IT职位市场。系统能够自动抓取职位信息、智能提取和分类关键词、分析市场趋势，帮助求职者和招聘方更好地理解市场需求。
+一个智能化的职位描述（JD）追踪和分析系统，专注于新西兰IT职位市场。系统能够自动抓取Seek NZ职位信息、智能提取和分类关键词、分析市场趋势，帮助求职者和招聘方更好地理解市场需求。
+
+## 🆕 最新功能
+
+- ✅ **月度关键词对比**：自动对比上月和本月的关键词变化，显示Top 7总体变化和Top 5角色族变化
+- ✅ **关键词规范化**：自动合并CI/CD、.NET等变体关键词，避免重复统计
+- ✅ **智能过滤**：自动过滤通用词、日期、月份等无意义关键词
+- ✅ **仅支持Seek NZ**：专注于新西兰市场，自动过滤非新西兰职位
 
 ## ✨ 主要功能
 
 ### 🎯 核心特性
 
 - **智能关键词提取**：自动从职位描述中提取技术关键词，并智能分类为"必须拥有"和"加分项"
-- **自动职位抓取**：支持从Seek NZ等平台自动抓取最新职位信息（使用Playwright）
+- **自动职位抓取**：支持从Seek NZ自动抓取最新职位信息（使用Playwright）
 - **增量抓取与去重**：自动检测重复职位，只保存新职位，避免数据冗余
 - **定时任务**：每小时自动抓取最新职位（使用APScheduler）
 - **角色与资历推断**：自动从职位标题和描述中推断角色族（fullstack/devops等）和资历级别
@@ -123,7 +130,8 @@ python scripts/seed.py
 
 2. **职位列表** (`/jobs`)
    - 浏览所有职位
-   - 按角色族（fullstack）和资历级别过滤
+   - 按角色族（fullstack）和资历级别（graduate/junior/intermediate/senior）过滤
+   - 按关键词搜索
    - 点击职位查看详细信息
    - 自动每30秒刷新，或手动点击刷新按钮
 
@@ -135,10 +143,14 @@ python scripts/seed.py
 
 4. **趋势分析** (`/trends`)
    - 查看总体职位统计
-   - 角色族分布（饼图）
-   - 资历级别分布（饼图）
-   - Top 20关键词（柱状图）
+   - 角色族分布（饼图，颜色与标签一致）
+   - 资历级别分布（饼图，颜色与标签一致）
+   - Top 20关键词（柱状图，自动过滤通用词、日期、月份）
    - 按角色族查看Top 20关键词
+   - **上月vs本月关键词对比**：
+     - 总体Top 7变化最大的关键词
+     - 各角色族Top 5变化最大的关键词
+     - 显示变化量、变化率和状态（新增/增长/下降/不变）
 
 5. **手动添加职位** (`/manual-job`)
    - 输入职位标题、公司、地点、URL
@@ -159,7 +171,7 @@ python scripts/seed.py
 - `GET /jobs/{id}/extraction` - 获取关键词提取结果
 
 **职位抓取**
-- `POST /scraper/trigger` - 手动触发职位抓取
+- `POST /scraper/trigger` - 手动触发职位抓取（仅支持Seek NZ）
 - `POST /capture` - 捕获职位信息（用于Chrome扩展）
 
 **手动添加**
@@ -167,6 +179,9 @@ python scripts/seed.py
 
 **趋势分析**
 - `GET /analytics/trends` - 获取趋势分析数据
+  - 支持按角色族、资历级别、地点过滤
+  - 返回总体Top 30关键词、各角色族Top 20关键词
+  - 返回上月vs本月对比（总体Top 7、各角色族Top 5）
 
 #### API示例
 
@@ -213,10 +228,13 @@ JDSignal/
 │   │       ├── scraper_service.py    # 抓取服务
 │   │       └── scheduler_service.py  # 定时任务服务
 │   ├── scripts/              # 工具脚本
-│   │   ├── scrape_jobs.py   # 职位抓取脚本
+│   │   ├── scrape_jobs.py   # Seek职位抓取脚本
+│   │   ├── scrape_nz_jobs.py # 新西兰职位抓取脚本
 │   │   ├── seed.py          # 种子数据
 │   │   ├── export_csv.py    # CSV导出
-│   │   └── export_jsonl.py  # JSONL导出
+│   │   ├── export_jsonl.py  # JSONL导出
+│   │   ├── re_extract_keywords.py  # 重新提取关键词脚本
+│   │   └── clean_non_nz_jobs.py    # 清理非新西兰职位脚本
 │   ├── tests/               # 测试代码
 │   ├── jobs.db             # SQLite数据库（自动创建）
 │   └── requirements.txt    # Python依赖
@@ -250,6 +268,8 @@ JDSignal/
 - `NZ_IT_KEYWORDS` - 搜索关键词列表
 - `max_per_keyword` - 每个关键词最多抓取的职位数
 - `headless` - 是否使用无头模式
+
+**注意**：系统仅支持Seek NZ（seek.co.nz）的职位抓取，自动过滤非新西兰职位。
 
 ### 定时任务
 
@@ -317,6 +337,14 @@ playwright install firefox
 
 - 系统使用上下文分析来分类关键词，但某些复杂的职位描述可能需要手动调整
 - 可以通过修改 `backend/app/extractors/skill_dictionary.json` 添加新的技能和别名
+- 如果发现通用词未被过滤，可以运行重新提取脚本：`python scripts/re_extract_keywords.py`
+
+### 关键词重复（如CI和CD分开显示）
+
+- 系统会自动合并CI和CD为CI/CD（当两者同时出现时）
+- 如果仍看到重复，可能是数据库中已有旧数据，运行重新提取脚本更新
+- 如果发现通用词未被过滤，可以运行重新提取脚本：`python scripts/re_extract_keywords.py`
+
 
 ## 📝 开发说明
 

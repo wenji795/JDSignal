@@ -626,6 +626,33 @@ def extract_keywords(jd_text: str) -> Dict:
         if term_lower.isdigit():
             return True
         
+        # 过滤掉年份（4位数字，范围1900-2100）
+        if term.isdigit() and len(term) == 4:
+            year = int(term)
+            if 1900 <= year <= 2100:
+                return True
+        
+        # 过滤掉月份名称（全称和缩写）
+        month_names = {
+            'january', 'february', 'march', 'april', 'may', 'june',
+            'july', 'august', 'september', 'october', 'november', 'december',
+            'jan', 'feb', 'mar', 'apr', 'may', 'jun',
+            'jul', 'aug', 'sep', 'sept', 'oct', 'nov', 'dec'
+        }
+        # 使用小写比较（term_lower已经转换为小写）
+        if term_lower in month_names:
+            return True
+        
+        # 过滤掉日期格式（如 01/01/2024, 2024-01-01, 01-01-2024）
+        date_patterns = [
+            r'^\d{1,2}[/-]\d{1,2}[/-]\d{2,4}$',  # 01/01/2024, 01-01-2024
+            r'^\d{4}[/-]\d{1,2}[/-]\d{1,2}$',     # 2024-01-01, 2024/01/01
+            r'^\d{1,2}\.\d{1,2}\.\d{2,4}$',      # 01.01.2024
+        ]
+        for pattern in date_patterns:
+            if re.match(pattern, term):
+                return True
+        
         return False
     
     # 过滤keywords列表

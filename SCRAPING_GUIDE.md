@@ -26,18 +26,15 @@ playwright install chromium
 
 ```bash
 cd backend
-python scripts/scrape_jobs.py \
-  "https://www.linkedin.com/jobs/view/1234567890" \
-  "https://www.seek.com.au/job/12345678"
+python scripts/scrape_jobs.py "https://www.seek.co.nz/job/12345678"
 ```
 
 ### 方式2: 从文件读取URL列表
 
 创建URL文件（如 `urls.txt`）：
 ```
-https://www.linkedin.com/jobs/view/1234567890
-https://www.linkedin.com/jobs/view/0987654321
-https://www.seek.com.au/job/12345678
+https://www.seek.co.nz/job/12345678
+https://www.seek.co.nz/job/87654321
 ```
 
 然后运行：
@@ -47,7 +44,14 @@ cd backend
 python scripts/scrape_jobs.py --file urls.txt
 ```
 
-### 方式3: 无头模式（后台运行，不显示浏览器）
+### 方式3: 搜索模式（自动搜索并抓取）
+
+```bash
+cd backend
+python scripts/scrape_jobs.py --search-seek "software test" --max-results 20
+```
+
+### 方式4: 无头模式（后台运行，不显示浏览器）
 
 ```bash
 python scripts/scrape_jobs.py --headless --file urls.txt
@@ -55,14 +59,11 @@ python scripts/scrape_jobs.py --headless --file urls.txt
 
 ## 注意事项
 
-### LinkedIn
-- 某些LinkedIn职位可能需要登录才能查看完整信息
-- 脚本会在浏览器窗口中打开页面，如果需要登录，请在窗口中手动登录
-- 建议使用有头模式（默认）以便查看和调试
-
 ### Seek
+- 仅支持Seek NZ（seek.co.nz）的职位
 - Seek的公开职位通常不需要登录
 - 如果遇到验证码，需要在浏览器窗口中手动完成
+- 系统会自动过滤非新西兰的职位
 
 ## 工作原理
 
@@ -79,17 +80,19 @@ python scripts/scrape_jobs.py --headless --file urls.txt
 ## 示例
 
 ```bash
-# 抓取单个LinkedIn职位
-python scripts/scrape_jobs.py "https://www.linkedin.com/jobs/view/1234567890"
+# 抓取单个Seek职位
+python scripts/scrape_jobs.py "https://www.seek.co.nz/job/12345678"
 
 # 抓取多个职位
 python scripts/scrape_jobs.py \
-  "https://www.linkedin.com/jobs/view/1234567890" \
-  "https://www.linkedin.com/jobs/view/0987654321" \
-  "https://www.seek.com.au/job/12345678"
+  "https://www.seek.co.nz/job/12345678" \
+  "https://www.seek.co.nz/job/87654321"
 
 # 从文件批量抓取
 python scripts/scrape_jobs.py --file job_urls.txt
+
+# 搜索并自动抓取
+python scripts/scrape_jobs.py --search-seek "python developer" --max-results 30
 ```
 
 ## 故障排查

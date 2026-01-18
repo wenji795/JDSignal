@@ -4,6 +4,7 @@ from sqlmodel import Session, select, func, and_, or_
 from typing import Dict, Any, Optional
 from collections import Counter
 from datetime import datetime, timedelta
+import re
 
 from app.database import get_session
 from app.models import Job, Extraction, Seniority
@@ -38,6 +39,28 @@ COMMON_KEYWORDS_TO_FILTER = {
     'akl', 'wlg', 'chc', 'ham', 'dun', 'tau'  # 城市缩写
 }
 
+def normalize_keyword(term: str) -> str:
+    """
+    规范化关键词，将变体统一为标准形式
+    例如：CI, CD, CI/CD, CI CD -> CI/CD
+         .NET, NET -> .NET
+    """
+    if not term:
+        return term
+    
+    term_stripped = term.strip()
+    term_upper = term_stripped.upper()
+    
+    # .NET相关：NET, .net -> .NET（统一为标准形式）
+    if term_upper == 'NET' or term_upper == '.NET':
+        return '.NET'
+    
+    # CI/CD相关：CI, CD, CI/CD, CI CD -> CI/CD
+    # 注意：这个在调用处处理，因为需要合并计数
+    
+    return term_stripped
+
+
 def should_filter_keyword(term: str) -> bool:
     """检查关键词是否应该被过滤"""
     if not term or len(term.strip()) == 0:
@@ -53,6 +76,35 @@ def should_filter_keyword(term: str) -> bool:
     # 检查大写形式（处理 "SEEK", "NZ", "CBD" 等全大写词）
     if term_upper.lower() in COMMON_KEYWORDS_TO_FILTER:
         return True
+    
+    # 过滤掉年份（4位数字，范围1900-2100）
+    if term.isdigit() and len(term) == 4:
+        try:
+            year = int(term)
+            if 1900 <= year <= 2100:
+                return True
+        except ValueError:
+            pass
+    
+    # 过滤掉月份名称（全称和缩写）- 使用小写比较
+    month_names = {
+        'january', 'february', 'march', 'april', 'may', 'june',
+        'july', 'august', 'september', 'october', 'november', 'december',
+        'jan', 'feb', 'mar', 'apr', 'may', 'jun',
+        'jul', 'aug', 'sep', 'sept', 'oct', 'nov', 'dec'
+    }
+    if term_lower in month_names:
+        return True
+    
+    # 过滤掉日期格式（如 01/01/2024, 2024-01-01, 01-01-2024）
+    date_patterns = [
+        r'^\d{1,2}[/-]\d{1,2}[/-]\d{2,4}$',  # 01/01/2024, 01-01-2024
+        r'^\d{4}[/-]\d{1,2}[/-]\d{1,2}$',     # 2024-01-01, 2024/01/01
+        r'^\d{1,2}\.\d{1,2}\.\d{2,4}$',      # 01.01.2024
+    ]
+    for pattern in date_patterns:
+        if re.match(pattern, term):
+            return True
     
     # 特殊处理：过滤掉常见的2-3字母缩写（如果不是技术术语）
     if len(term_lower) <= 3:
@@ -88,8 +140,10 @@ def get_trends(
     - count_by_role_family: 按角色族统计
     - count_by_seniority: 按资历级别统计
     - top_keywords: 前30个关键词及计数
-    - top_keywords_by_role_family: 每个角色族的前10个关键词
-    - keyword_growth: 关键词增长趋势（前半段 vs 后半段）
+    - top_keywords_by_role_family: 每个角色族的前20个关键词
+    - monthly_comparison: 上月vs本月关键词对比
+        - comparison: 总体Top 7变化最大的关键词
+        - by_role_family: 按角色族分组的Top 5关键词变化
     """
     from sqlmodel import or_
     
@@ -167,13 +221,48 @@ def get_trends(
             term = kw.get("term", "")
             # 过滤掉通用关键词
             if term and not should_filter_keyword(term):
-                keyword_counter[term] += 1
+                # 规范化关键词
+                normalized_term = normalize_keyword(term)
+                
+                # 处理CI/CD变体：CI/CD, CI CD -> CI/CD（统一格式）
+                term_upper = normalized_term.upper().strip()
+                if term_upper == 'CI/CD' or term_upper == 'CI CD':
+                    normalized_term = 'CI/CD'
+                # 注意：单独的CI或CD保留原样，不强制合并
+                
+                keyword_counter[normalized_term] += 1
                 
                 # 按角色族统计
                 if job.role_family:
                     if job.role_family not in keyword_by_role_family:
                         keyword_by_role_family[job.role_family] = Counter()
-                    keyword_by_role_family[job.role_family][term] += 1
+                    keyword_by_role_family[job.role_family][normalized_term] += 1
+    
+    # 后处理：如果CI和CD同时存在，合并为CI/CD
+    if 'CI' in keyword_counter and 'CD' in keyword_counter:
+        ci_count = keyword_counter['CI']
+        cd_count = keyword_counter['CD']
+        # 合并计数（取较大值，或相加，这里选择相加）
+        combined_count = ci_count + cd_count
+        # 如果CI/CD已经存在，也加上它的计数
+        if 'CI/CD' in keyword_counter:
+            combined_count += keyword_counter['CI/CD']
+        keyword_counter['CI/CD'] = combined_count
+        # 删除单独的CI和CD
+        del keyword_counter['CI']
+        del keyword_counter['CD']
+    
+    # 同样处理按角色族的统计
+    for role_fam, counter in keyword_by_role_family.items():
+        if 'CI' in counter and 'CD' in counter:
+            ci_count = counter['CI']
+            cd_count = counter['CD']
+            combined_count = ci_count + cd_count
+            if 'CI/CD' in counter:
+                combined_count += counter['CI/CD']
+            counter['CI/CD'] = combined_count
+            del counter['CI']
+            del counter['CD']
     
     top_keywords = [{"term": term, "count": count} for term, count in keyword_counter.most_common(30)]
     
@@ -192,23 +281,79 @@ def get_trends(
     if role_family and role_family in top_keywords_by_role_family:
         selected_role_family_top_keywords = top_keywords_by_role_family[role_family]
     
-    # 8. 关键词增长分析（比较前半段和后半段）
-    keyword_growth = {}
-    if len(jobs) > 1:
-        # 按captured_at排序
-        sorted_jobs = sorted(jobs, key=lambda j: j.captured_at)
-        mid_point = len(sorted_jobs) // 2
-        first_half_jobs = sorted_jobs[:mid_point]
-        second_half_jobs = sorted_jobs[mid_point:]
+    # 8. 上月vs本月关键词比较
+    # 注意：月度比较需要独立查询，不受days参数限制，确保能获取到上个月的数据
+    monthly_comparison = {}
+    now = datetime.utcnow()
+    # 计算本月开始和结束时间
+    current_month_start = datetime(now.year, now.month, 1)
+    current_month_end = now
+    # 计算上月开始和结束时间
+    # 先计算上个月的第一天
+    if now.month == 1:
+        last_month_start = datetime(now.year - 1, 12, 1)
+    else:
+        last_month_start = datetime(now.year, now.month - 1, 1)
+    # 上个月的最后一天是本月第一天减1天
+    last_month_end = current_month_start - timedelta(days=1)
+    
+    # 独立查询本月和上月的职位（不受days参数限制）
+    monthly_job_query = select(Job).where(
+        (Job.captured_at >= last_month_start) & (Job.captured_at <= current_month_end)
+    )
+    
+    # 应用相同的过滤条件（role_family, seniority, location）
+    if role_family:
+        monthly_job_query = monthly_job_query.where(Job.role_family == role_family)
+    if seniority:
+        seniority_mapping = {
+            'graduate': Seniority.JUNIOR,
+            'junior': Seniority.JUNIOR,
+            'intermediate': Seniority.MID,
+            'mid': Seniority.MID,
+            'senior': Seniority.SENIOR
+        }
+        mapped_seniority = seniority_mapping.get(seniority.lower())
+        if mapped_seniority:
+            monthly_job_query = monthly_job_query.where(Job.seniority == mapped_seniority)
+        else:
+            try:
+                monthly_job_query = monthly_job_query.where(Job.seniority == Seniority(seniority.lower()))
+            except ValueError:
+                pass
+    if location:
+        monthly_job_query = monthly_job_query.where(Job.location.contains(location))
+    
+    monthly_jobs = session.exec(monthly_job_query).all()
+    monthly_job_ids = [job.id for job in monthly_jobs]
+    
+    # 分别获取本月和上月的职位
+    current_month_jobs = [j for j in monthly_jobs if current_month_start <= j.captured_at <= current_month_end]
+    last_month_jobs = [j for j in monthly_jobs if last_month_start <= j.captured_at <= last_month_end]
+    
+    if current_month_jobs or last_month_jobs:
+        # 获取本月和上月的提取结果
+        current_month_job_ids = {job.id for job in current_month_jobs}
+        last_month_job_ids = {job.id for job in last_month_jobs}
         
-        first_half_ids = {job.id for job in first_half_jobs}
-        second_half_ids = {job.id for job in second_half_jobs}
+        # 获取月度比较相关的提取结果
+        if monthly_job_ids:
+            monthly_extraction_query = select(Extraction).where(Extraction.job_id.in_(monthly_job_ids))
+            monthly_extractions = session.exec(monthly_extraction_query).all()
+            monthly_job_map = {job.id: job for job in monthly_jobs}
+            monthly_extractions_with_jobs = [(ext, monthly_job_map.get(ext.job_id)) for ext in monthly_extractions if ext.job_id in monthly_job_map]
+        else:
+            monthly_extractions_with_jobs = []
         
-        # 统计前半段关键词（过滤通用词）
-        first_half_counter = Counter()
-        second_half_counter = Counter()
+        # 总体关键词统计（所有角色族）
+        current_month_counter = Counter()
+        last_month_counter = Counter()
         
-        for extraction, job in extractions_with_jobs:
+        # 按角色族分组的关键词统计
+        current_month_by_role_family = {}  # role_family -> Counter
+        last_month_by_role_family = {}     # role_family -> Counter
+        
+        for extraction, job in monthly_extractions_with_jobs:
             if not job:
                 continue
             keywords_data = extraction.keywords_json.get("keywords", [])
@@ -216,31 +361,164 @@ def get_trends(
                 term = kw.get("term", "")
                 # 过滤掉通用关键词
                 if term and not should_filter_keyword(term):
-                    if job.id in first_half_ids:
-                        first_half_counter[term] += 1
-                    elif job.id in second_half_ids:
-                        second_half_counter[term] += 1
+                    # 规范化关键词
+                    normalized_term = normalize_keyword(term)
+                    
+                    # 处理CI/CD变体：CI/CD, CI CD -> CI/CD（统一格式）
+                    term_upper = normalized_term.upper().strip()
+                    if term_upper == 'CI/CD' or term_upper == 'CI CD':
+                        normalized_term = 'CI/CD'
+                    # 注意：单独的CI或CD保留原样，不强制合并
+                    
+                    # 总体统计
+                    if job.id in current_month_job_ids:
+                        current_month_counter[normalized_term] += 1
+                    elif job.id in last_month_job_ids:
+                        last_month_counter[normalized_term] += 1
+                    
+                    # 按角色族统计
+                    if job.role_family:
+                        if job.id in current_month_job_ids:
+                            if job.role_family not in current_month_by_role_family:
+                                current_month_by_role_family[job.role_family] = Counter()
+                            current_month_by_role_family[job.role_family][normalized_term] += 1
+                        elif job.id in last_month_job_ids:
+                            if job.role_family not in last_month_by_role_family:
+                                last_month_by_role_family[job.role_family] = Counter()
+                            last_month_by_role_family[job.role_family][normalized_term] += 1
         
-        # 计算增长
-        all_terms = set(first_half_counter.keys()) | set(second_half_counter.keys())
-        for term in all_terms:
-            first_count = first_half_counter.get(term, 0)
-            second_count = second_half_counter.get(term, 0)
+        # 后处理：如果CI和CD同时存在，合并为CI/CD
+        if 'CI' in current_month_counter and 'CD' in current_month_counter:
+            ci_count = current_month_counter['CI']
+            cd_count = current_month_counter['CD']
+            combined_count = ci_count + cd_count
+            if 'CI/CD' in current_month_counter:
+                combined_count += current_month_counter['CI/CD']
+            current_month_counter['CI/CD'] = combined_count
+            del current_month_counter['CI']
+            del current_month_counter['CD']
+        
+        if 'CI' in last_month_counter and 'CD' in last_month_counter:
+            ci_count = last_month_counter['CI']
+            cd_count = last_month_counter['CD']
+            combined_count = ci_count + cd_count
+            if 'CI/CD' in last_month_counter:
+                combined_count += last_month_counter['CI/CD']
+            last_month_counter['CI/CD'] = combined_count
+            del last_month_counter['CI']
+            del last_month_counter['CD']
+        
+        # 同样处理按角色族的统计
+        for role_fam in set(current_month_by_role_family.keys()) | set(last_month_by_role_family.keys()):
+            current_rf = current_month_by_role_family.get(role_fam, Counter())
+            last_rf = last_month_by_role_family.get(role_fam, Counter())
             
-            delta = second_count - first_count
-            if first_count > 0:
-                percent_change = (delta / first_count) * 100
-            elif second_count > 0:
-                percent_change = 100.0  # 从0到有值，增长100%
+            if 'CI' in current_rf and 'CD' in current_rf:
+                ci_count = current_rf['CI']
+                cd_count = current_rf['CD']
+                combined_count = ci_count + cd_count
+                if 'CI/CD' in current_rf:
+                    combined_count += current_rf['CI/CD']
+                current_rf['CI/CD'] = combined_count
+                del current_rf['CI']
+                del current_rf['CD']
+            
+            if 'CI' in last_rf and 'CD' in last_rf:
+                ci_count = last_rf['CI']
+                cd_count = last_rf['CD']
+                combined_count = ci_count + cd_count
+                if 'CI/CD' in last_rf:
+                    combined_count += last_rf['CI/CD']
+                last_rf['CI/CD'] = combined_count
+                del last_rf['CI']
+                del last_rf['CD']
+        
+        # 计算总体变化（Top 7）
+        all_monthly_terms = set(current_month_counter.keys()) | set(last_month_counter.keys())
+        monthly_comparison_data = []
+        
+        for term in all_monthly_terms:
+            current_count = current_month_counter.get(term, 0)
+            last_count = last_month_counter.get(term, 0)
+            
+            delta = current_count - last_count
+            if last_count > 0:
+                percent_change = (delta / last_count) * 100
+            elif current_count > 0:
+                percent_change = 100.0  # 新增关键词，增长100%
             else:
                 percent_change = 0.0
             
-            keyword_growth[term] = {
-                "first_half_count": first_count,
-                "second_half_count": second_count,
+            monthly_comparison_data.append({
+                "term": term,
+                "current_month_count": current_count,
+                "last_month_count": last_count,
                 "delta": delta,
-                "percent_change": round(percent_change, 2)
-            }
+                "percent_change": round(percent_change, 2),
+                "status": "new" if last_count == 0 and current_count > 0 else 
+                         "increased" if delta > 0 else 
+                         "decreased" if delta < 0 else "unchanged"
+            })
+        
+        # 按变化量排序（优先显示增长最多的），取Top 7
+        monthly_comparison_data.sort(key=lambda x: (x["delta"], x["current_month_count"]), reverse=True)
+        
+        # 按角色族计算变化（每个角色族Top 5）
+        monthly_comparison_by_role_family = {}
+        all_role_families = set(current_month_by_role_family.keys()) | set(last_month_by_role_family.keys())
+        
+        for role_fam in all_role_families:
+            current_rf_counter = current_month_by_role_family.get(role_fam, Counter())
+            last_rf_counter = last_month_by_role_family.get(role_fam, Counter())
+            
+            rf_terms = set(current_rf_counter.keys()) | set(last_rf_counter.keys())
+            rf_comparison_data = []
+            
+            for term in rf_terms:
+                current_count = current_rf_counter.get(term, 0)
+                last_count = last_rf_counter.get(term, 0)
+                
+                delta = current_count - last_count
+                if last_count > 0:
+                    percent_change = (delta / last_count) * 100
+                elif current_count > 0:
+                    percent_change = 100.0
+                else:
+                    percent_change = 0.0
+                
+                rf_comparison_data.append({
+                    "term": term,
+                    "current_month_count": current_count,
+                    "last_month_count": last_count,
+                    "delta": delta,
+                    "percent_change": round(percent_change, 2),
+                    "status": "new" if last_count == 0 and current_count > 0 else 
+                             "increased" if delta > 0 else 
+                             "decreased" if delta < 0 else "unchanged"
+                })
+            
+            # 按变化量排序，取Top 5
+            rf_comparison_data.sort(key=lambda x: (x["delta"], x["current_month_count"]), reverse=True)
+            monthly_comparison_by_role_family[role_fam] = rf_comparison_data[:5]
+        
+        monthly_comparison = {
+            "current_month": {
+                "start": current_month_start.isoformat(),
+                "end": current_month_end.isoformat(),
+                "job_count": len(current_month_jobs)
+            },
+            "last_month": {
+                "start": last_month_start.isoformat(),
+                "end": last_month_end.isoformat(),
+                "job_count": len(last_month_jobs)
+            },
+            "comparison": monthly_comparison_data[:7],  # Top 7变化最大的关键词（总体）
+            "by_role_family": monthly_comparison_by_role_family  # 按角色族分组的Top 5
+        }
+    
+    # 9. 关键词增长分析（已废弃，改用monthly_comparison）
+    # 保留此字段以保持API兼容性，但使用空字典
+    keyword_growth = {}
     
     result = {
         "total_jobs": total_jobs,
@@ -248,7 +526,8 @@ def get_trends(
         "count_by_seniority": dict(count_by_seniority),
         "top_keywords": top_keywords,
         "top_keywords_by_role_family": top_keywords_by_role_family,
-        "keyword_growth": keyword_growth
+        "keyword_growth": keyword_growth,
+        "monthly_comparison": monthly_comparison
     }
     
     # 如果指定了role_family筛选，添加该角色族的top20关键词

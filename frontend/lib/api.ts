@@ -57,6 +57,34 @@ export interface TrendsResponse {
     delta: number;
     percent_change: number;
   }>;
+  monthly_comparison?: {
+    current_month: {
+      start: string;
+      end: string;
+      job_count: number;
+    };
+    last_month: {
+      start: string;
+      end: string;
+      job_count: number;
+    };
+    comparison: Array<{
+      term: string;
+      current_month_count: number;
+      last_month_count: number;
+      delta: number;
+      percent_change: number;
+      status: 'new' | 'increased' | 'decreased' | 'unchanged';
+    }>;
+    by_role_family?: Record<string, Array<{
+      term: string;
+      current_month_count: number;
+      last_month_count: number;
+      delta: number;
+      percent_change: number;
+      status: 'new' | 'increased' | 'decreased' | 'unchanged';
+    }>>;
+  };
 }
 
 /**

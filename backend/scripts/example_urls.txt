@@ -1,8 +1,8 @@
 # 职位URL示例文件
 # 每行一个URL
 
-# LinkedIn示例（需要替换为真实URL）
-# https://www.linkedin.com/jobs/view/1234567890
+# Seek NZ示例（需要替换为真实URL）
+# https://www.seek.co.nz/job/12345678
 
 # Seek示例（需要替换为真实URL）
 # https://www.seek.com.au/job/12345678
