@@ -140,20 +140,18 @@ export default function TrendsPage() {
   }))
   
   // 图表标题
+  const roleFamilyLabel = roleFamilyOptions.find(opt => opt.value === roleFamily)?.label || roleFamily
   const keywordsChartTitle = roleFamily && trends.selected_role_family_top_keywords
-    ? `${roleFamilyOptions.find(opt => opt.value === roleFamily)?.label || roleFamily} - Top 20 关键词`
+    ? `${roleFamilyLabel} - Top 20 关键词`
     : 'Top 20 关键词（全部）'
 
-  // 关键词增长数据（取top 10增长）
-  const growthData = Object.entries(trends.keyword_growth)
-    .sort((a, b) => b[1].percent_change - a[1].percent_change)
-    .slice(0, 10)
-    .map(([term, data]) => ({
-      name: term.length > 15 ? term.substring(0, 15) + '...' : term,
-      fullName: term,
-      percent_change: data.percent_change,
-      delta: data.delta
-    }))
+  // 关键词增长数据（取top 10增长）- 已废弃，使用monthly_comparison代替
+  const growthData: Array<{
+    name: string
+    fullName: string
+    percent_change: number
+    delta: number
+  }> = []
 
   return (
     <div>
