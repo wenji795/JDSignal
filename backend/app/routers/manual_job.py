@@ -8,7 +8,7 @@ from datetime import datetime
 from app.database import get_session
 from app.models import Job, Extraction, JobStatus
 from app.schemas import JobResponse, ExtractionResponse
-from app.extractors.keyword_extractor import extract_and_save
+from app.extractors.keyword_extractor import extract_and_save_sync
 from app.extractors.role_inferrer import infer_role_and_seniority
 
 router = APIRouter(prefix="/manual-job", tags=["manual-job"])
@@ -67,12 +67,20 @@ def create_manual_job(
     session.commit()
     session.refresh(job)
     
-    # 自动运行提取
+    # 自动运行提取（支持AI增强）
     try:
-        extract_and_save(job.id, job.jd_text, session)
+        extract_and_save_sync(
+            job.id, 
+            job.jd_text, 
+            session,
+            job_title=job.title,
+            company=job.company,
+            use_ai=True
+        )
         session.refresh(job)
     except Exception as e:
         # 即使提取失败，也返回创建的职位
+        print(f"提取失败: {e}")
         pass
     
     # 获取提取结果
@@ -100,6 +108,8 @@ def create_manual_job(
             years_required=extraction.years_required,
             degree_required=extraction.degree_required,
             certifications_json=extraction.certifications_json,
+            summary=extraction.summary,
+            extraction_method=extraction.extraction_method,
             extracted_at=extraction.extracted_at
         ) if extraction else None
     }

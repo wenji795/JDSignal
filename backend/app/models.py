@@ -58,6 +58,8 @@ class Extraction(SQLModel, table=True):
     years_required: Optional[int] = None  # 所需经验年限
     degree_required: Optional[str] = None  # 所需学位
     certifications_json: dict = Field(default_factory=dict, sa_column=Column(JSON))  # 证书列表
+    summary: Optional[str] = Field(default=None, sa_column=Column(Text))  # AI生成的职位摘要
+    extraction_method: Optional[str] = Field(default=None)  # 提取方法：ai-enhanced 或 rule-based
     extracted_at: datetime = Field(default_factory=datetime.utcnow)
     
     # 关联的职位

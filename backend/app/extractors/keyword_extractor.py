@@ -682,29 +682,89 @@ def extract_keywords(jd_text: str) -> Dict:
     }
 
 
-def extract_and_save(job_id, jd_text: str, session) -> None:
+async def extract_and_save(
+    job_id, 
+    jd_text: str, 
+    session,
+    job_title: Optional[str] = None,
+    company: Optional[str] = None,
+    use_ai: bool = True
+) -> None:
     """
     从JD文本中提取关键词并保存到数据库
-    这是一个适配函数，将extract_keywords的输出转换为数据库格式
+    支持AI增强提取和规则提取的混合模式
     
     Args:
         job_id: 职位ID (UUID)
         jd_text: 职位描述文本
         session: SQLModel Session
+        job_title: 职位标题（可选，用于AI提取）
+        company: 公司名称（可选，用于AI提取）
+        use_ai: 是否使用AI提取（默认True）
     """
     from sqlmodel import Session, select
-    from app.models import Extraction
+    from app.models import Extraction, Job
     from datetime import datetime
     from uuid import UUID
     
-    # 提取关键词
-    extracted = extract_keywords(jd_text)
+    # 尝试使用AI增强提取
+    try:
+        from app.extractors.ai_enhanced_extractor import extract_keywords_hybrid
+        
+        extracted = await extract_keywords_hybrid(
+            jd_text=jd_text,
+            job_title=job_title,
+            company=company,
+            use_ai=use_ai
+        )
+        
+        extraction_method = "ai-enhanced" if extracted.get("extraction_method") != "rule-based" else "rule-based"
+        
+        # 如果AI提取成功且提供了角色族和资历级别，更新Job模型
+        if extraction_method == "ai-enhanced" and extracted.get("role_family"):
+            job = session.get(Job, job_id)
+            if job:
+                if extracted.get("role_family") and extracted["role_family"] != "unknown":
+                    job.role_family = extracted["role_family"]
+                if extracted.get("seniority") and extracted["seniority"] != "unknown":
+                    # 映射到Seniority枚举
+                    seniority_map = {
+                        "graduate": "graduate",
+                        "junior": "junior",
+                        "intermediate": "mid",
+                        "senior": "senior",
+                        "lead": "lead",
+                        "architect": "architect",
+                        "manager": "manager"
+                    }
+                    seniority_value = seniority_map.get(extracted["seniority"])
+                    if seniority_value:
+                        from app.models import Seniority
+                        try:
+                            job.seniority = Seniority(seniority_value)
+                        except ValueError:
+                            pass
+                session.add(job)
+        
+    except Exception as e:
+        # 如果AI提取失败，回退到规则提取
+        print(f"AI提取失败，回退到规则提取: {e}")
+        extracted = extract_keywords(jd_text)
+        extraction_method = "rule-based"
     
     # 转换为数据库格式
-    keywords_json = {"keywords": extracted["keywords"]}
-    must_have_json = {"keywords": extracted["must_have_keywords"]}
-    nice_to_have_json = {"keywords": extracted["nice_to_have_keywords"]}
-    certifications_json = {"certifications": extracted["certifications"]}
+    # 处理keywords格式：AI返回的是字符串列表，规则提取返回的是字典列表
+    if extracted.get("keywords") and isinstance(extracted["keywords"][0], str):
+        # AI格式：字符串列表
+        keywords_list = extracted["keywords"]
+    else:
+        # 规则格式：字典列表，提取term字段
+        keywords_list = [kw["term"] if isinstance(kw, dict) else kw for kw in extracted.get("keywords", [])]
+    
+    keywords_json = {"keywords": keywords_list}
+    must_have_json = {"keywords": extracted.get("must_have_keywords", [])}
+    nice_to_have_json = {"keywords": extracted.get("nice_to_have_keywords", [])}
+    certifications_json = {"certifications": extracted.get("certifications", [])}
     
     # 检查是否已存在提取结果
     statement = select(Extraction).where(Extraction.job_id == job_id)
@@ -715,9 +775,11 @@ def extract_and_save(job_id, jd_text: str, session) -> None:
         existing_extraction.keywords_json = keywords_json
         existing_extraction.must_have_json = must_have_json
         existing_extraction.nice_to_have_json = nice_to_have_json
-        existing_extraction.years_required = extracted["years_required"]
-        existing_extraction.degree_required = extracted["degree_required"]
+        existing_extraction.years_required = extracted.get("years_required")
+        existing_extraction.degree_required = extracted.get("degree_required")
         existing_extraction.certifications_json = certifications_json
+        existing_extraction.summary = extracted.get("summary")
+        existing_extraction.extraction_method = extraction_method
         existing_extraction.extracted_at = datetime.utcnow()
         session.add(existing_extraction)
     else:
@@ -727,11 +789,65 @@ def extract_and_save(job_id, jd_text: str, session) -> None:
             keywords_json=keywords_json,
             must_have_json=must_have_json,
             nice_to_have_json=nice_to_have_json,
-            years_required=extracted["years_required"],
-            degree_required=extracted["degree_required"],
+            years_required=extracted.get("years_required"),
+            degree_required=extracted.get("degree_required"),
             certifications_json=certifications_json,
+            summary=extracted.get("summary"),
+            extraction_method=extraction_method,
             extracted_at=datetime.utcnow()
         )
         session.add(extraction)
     
     session.commit()
+
+
+def extract_and_save_sync(
+    job_id, 
+    jd_text: str, 
+    session,
+    job_title: Optional[str] = None,
+    company: Optional[str] = None,
+    use_ai: bool = True
+) -> None:
+    """
+    同步包装器：从JD文本中提取关键词并保存到数据库
+    在同步上下文中调用异步函数
+    
+    Args:
+        job_id: 职位ID (UUID)
+        jd_text: 职位描述文本
+        session: SQLModel Session
+        job_title: 职位标题（可选，用于AI提取）
+        company: 公司名称（可选，用于AI提取）
+        use_ai: 是否使用AI提取（默认True）
+    """
+    import asyncio
+    
+    try:
+        # 尝试获取当前事件循环
+        loop = asyncio.get_event_loop()
+        if loop.is_running():
+            # 如果事件循环正在运行，使用 run_until_complete（需要 nest_asyncio）
+            try:
+                import nest_asyncio
+                nest_asyncio.apply()
+                loop.run_until_complete(extract_and_save(
+                    job_id, jd_text, session, job_title, company, use_ai
+                ))
+            except ImportError:
+                # 如果没有 nest_asyncio，回退到规则提取
+                print("警告: nest_asyncio 未安装，回退到规则提取")
+                use_ai = False
+                loop.run_until_complete(extract_and_save(
+                    job_id, jd_text, session, job_title, company, use_ai
+                ))
+        else:
+            # 事件循环未运行，使用 run
+            asyncio.run(extract_and_save(
+                job_id, jd_text, session, job_title, company, use_ai
+            ))
+    except RuntimeError:
+        # 没有事件循环，创建一个新的
+        asyncio.run(extract_and_save(
+            job_id, jd_text, session, job_title, company, use_ai
+        ))

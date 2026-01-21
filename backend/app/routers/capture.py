@@ -92,9 +92,17 @@ def capture_job(capture_data: CaptureRequest, session: Session = Depends(get_ses
     session.commit()
     session.refresh(job)
     
-    # 运行提取并存储结果
+    # 运行提取并存储结果（支持AI增强）
     try:
-        extract_and_save(job.id, job.jd_text, session)
+        from app.extractors.keyword_extractor import extract_and_save_sync
+        extract_and_save_sync(
+            job.id, 
+            job.jd_text, 
+            session,
+            job_title=job.title,
+            company=job.company,
+            use_ai=True
+        )
         session.refresh(job)
     except Exception as e:
         # 即使提取失败，也返回创建的职位

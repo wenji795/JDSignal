@@ -106,6 +106,8 @@ class ExtractionResponse(BaseModel):
     years_required: Optional[int]
     degree_required: Optional[str]
     certifications_json: Dict[str, Any]
+    summary: Optional[str] = None  # AI生成的职位摘要
+    extraction_method: Optional[str] = None  # 提取方法：ai-enhanced 或 rule-based
     extracted_at: datetime
 
     model_config = {"from_attributes": True}

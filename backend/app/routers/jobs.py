@@ -32,7 +32,7 @@ router = APIRouter(prefix="/jobs", tags=["jobs"])
     """,
     response_description="创建的职位信息（包含提取结果）"
 )
-def create_job(job_data: JobCreate, session: Session = Depends(get_session)):
+async def create_job(job_data: JobCreate, session: Session = Depends(get_session)):
     """创建新职位并自动运行提取"""
     # model_validator已经处理了jd_text和source的转换
     # 排除selected_text字段（它不应该保存到数据库）
@@ -42,12 +42,20 @@ def create_job(job_data: JobCreate, session: Session = Depends(get_session)):
     session.commit()
     session.refresh(job)
     
-    # 自动运行提取
+    # 自动运行提取（支持AI增强）
     try:
-        extract_and_save(job.id, job.jd_text, session)
+        await extract_and_save(
+            job.id, 
+            job.jd_text, 
+            session,
+            job_title=job.title,
+            company=job.company,
+            use_ai=True
+        )
         session.refresh(job)
     except Exception as e:
         # 即使提取失败，也返回创建的职位
+        print(f"提取失败: {e}")
         pass
     
     # 获取提取结果
@@ -75,6 +83,8 @@ def create_job(job_data: JobCreate, session: Session = Depends(get_session)):
             years_required=extraction.years_required,
             degree_required=extraction.degree_required,
             certifications_json=extraction.certifications_json,
+            summary=extraction.summary,
+            extraction_method=extraction.extraction_method,
             extracted_at=extraction.extracted_at
         ) if extraction else None
     }
@@ -228,6 +238,8 @@ def get_job(job_id: UUID, session: Session = Depends(get_session)):
             years_required=extraction.years_required,
             degree_required=extraction.degree_required,
             certifications_json=extraction.certifications_json,
+            summary=extraction.summary,
+            extraction_method=extraction.extraction_method,
             extracted_at=extraction.extracted_at
         ) if extraction else None
     }
@@ -249,7 +261,18 @@ def update_job(job_id: UUID, job_data: JobUpdate, session: Session = Depends(get
     
     # 如果jd_text更新了，重新运行提取
     if "jd_text" in update_data:
-        extract_and_save(job.id, job.jd_text, session)
+        from app.extractors.keyword_extractor import extract_and_save_sync
+        try:
+            extract_and_save_sync(
+                job.id, 
+                job.jd_text, 
+                session,
+                job_title=job.title,
+                company=job.company,
+                use_ai=True
+            )
+        except Exception as e:
+            print(f"提取失败: {e}")
     
     session.add(job)
     session.commit()
@@ -279,6 +302,8 @@ def update_job(job_id: UUID, job_data: JobUpdate, session: Session = Depends(get
             years_required=extraction.years_required,
             degree_required=extraction.degree_required,
             certifications_json=extraction.certifications_json,
+            summary=extraction.summary,
+            extraction_method=extraction.extraction_method,
             extracted_at=extraction.extracted_at
         ) if extraction else None
     }
@@ -306,5 +331,7 @@ def get_extraction(job_id: UUID, session: Session = Depends(get_session)):
         years_required=extraction.years_required,
         degree_required=extraction.degree_required,
         certifications_json=extraction.certifications_json,
+        summary=extraction.summary,
+        extraction_method=extraction.extraction_method,
         extracted_at=extraction.extracted_at
     )
