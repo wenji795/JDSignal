@@ -4,6 +4,14 @@ from fastapi.middleware.cors import CORSMiddleware
 from app.database import create_db_and_tables
 from app.routers import jobs, analytics, capture, manual_job, scraper
 
+# 加载 .env 文件中的环境变量
+try:
+    from dotenv import load_dotenv
+    load_dotenv()
+except ImportError:
+    # 如果没有安装 python-dotenv，跳过（可以使用系统环境变量）
+    pass
+
 # 尝试导入定时任务服务（可选）
 try:
     from app.services.scheduler_service import start_scheduler, stop_scheduler

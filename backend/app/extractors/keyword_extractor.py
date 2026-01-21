@@ -748,18 +748,26 @@ async def extract_and_save(
         
     except Exception as e:
         # 如果AI提取失败，回退到规则提取
+        import traceback
+        error_trace = traceback.format_exc()
         print(f"AI提取失败，回退到规则提取: {e}")
+        print(f"错误详情: {error_trace}")
         extracted = extract_keywords(jd_text)
         extraction_method = "rule-based"
     
     # 转换为数据库格式
     # 处理keywords格式：AI返回的是字符串列表，规则提取返回的是字典列表
-    if extracted.get("keywords") and isinstance(extracted["keywords"][0], str):
-        # AI格式：字符串列表
-        keywords_list = extracted["keywords"]
-    else:
-        # 规则格式：字典列表，提取term字段
-        keywords_list = [kw["term"] if isinstance(kw, dict) else kw for kw in extracted.get("keywords", [])]
+    try:
+        keywords_raw = extracted.get("keywords", [])
+        if keywords_raw and len(keywords_raw) > 0 and isinstance(keywords_raw[0], str):
+            # AI格式：字符串列表
+            keywords_list = keywords_raw
+        else:
+            # 规则格式：字典列表，提取term字段
+            keywords_list = [kw["term"] if isinstance(kw, dict) else kw for kw in keywords_raw]
+    except Exception as e:
+        print(f"处理keywords时出错: {e}")
+        keywords_list = []
     
     keywords_json = {"keywords": keywords_list}
     must_have_json = {"keywords": extracted.get("must_have_keywords", [])}
@@ -823,31 +831,123 @@ def extract_and_save_sync(
     """
     import asyncio
     
+    # 尝试导入 nest_asyncio，如果未安装则跳过
+    nest_asyncio_available = False
     try:
-        # 尝试获取当前事件循环
-        loop = asyncio.get_event_loop()
-        if loop.is_running():
-            # 如果事件循环正在运行，使用 run_until_complete（需要 nest_asyncio）
-            try:
-                import nest_asyncio
-                nest_asyncio.apply()
+        import nest_asyncio
+        nest_asyncio.apply()
+        nest_asyncio_available = True
+    except ImportError:
+        # 如果没有 nest_asyncio，将使用其他方法
+        pass
+    
+    try:
+        # 检查是否有运行中的事件循环
+        try:
+            loop = asyncio.get_running_loop()
+            # 如果有运行中的事件循环
+            if nest_asyncio_available:
+                # 使用 nest_asyncio 支持嵌套事件循环
                 loop.run_until_complete(extract_and_save(
                     job_id, jd_text, session, job_title, company, use_ai
                 ))
-            except ImportError:
-                # 如果没有 nest_asyncio，回退到规则提取
-                print("警告: nest_asyncio 未安装，回退到规则提取")
-                use_ai = False
-                loop.run_until_complete(extract_and_save(
-                    job_id, jd_text, session, job_title, company, use_ai
-                ))
-        else:
-            # 事件循环未运行，使用 run
+            else:
+                # 如果没有 nest_asyncio，在新线程中运行
+                import threading
+                import queue
+                result_queue = queue.Queue()
+                exception_queue = queue.Queue()
+                
+                def run_async():
+                    try:
+                        new_loop = asyncio.new_event_loop()
+                        asyncio.set_event_loop(new_loop)
+                        result = new_loop.run_until_complete(extract_and_save(
+                            job_id, jd_text, session, job_title, company, use_ai
+                        ))
+                        new_loop.close()
+                        result_queue.put(result)
+                    except Exception as e:
+                        exception_queue.put(e)
+                
+                thread = threading.Thread(target=run_async)
+                thread.start()
+                thread.join()
+                
+                if not exception_queue.empty():
+                    raise exception_queue.get()
+        except RuntimeError:
+            # 没有运行中的事件循环，直接使用 asyncio.run
             asyncio.run(extract_and_save(
                 job_id, jd_text, session, job_title, company, use_ai
             ))
-    except RuntimeError:
-        # 没有事件循环，创建一个新的
-        asyncio.run(extract_and_save(
-            job_id, jd_text, session, job_title, company, use_ai
-        ))
+    except Exception as e:
+        # 如果异步调用失败，回退到规则提取
+        print(f"异步提取失败，回退到规则提取: {e}")
+        import traceback
+        traceback.print_exc()
+        # 直接调用同步的规则提取
+        try:
+            extracted = extract_keywords(jd_text)
+            extraction_method = "rule-based"
+            
+            # 转换为数据库格式
+            keywords_list = [kw["term"] if isinstance(kw, dict) else kw for kw in extracted.get("keywords", [])]
+            keywords_json = {"keywords": keywords_list}
+            must_have_json = {"keywords": extracted.get("must_have_keywords", [])}
+            nice_to_have_json = {"keywords": extracted.get("nice_to_have_keywords", [])}
+            certifications_json = {"certifications": extracted.get("certifications", [])}
+            
+            # 保存到数据库
+            from sqlmodel import select
+            from app.models import Extraction
+            from datetime import datetime
+            
+            try:
+                statement = select(Extraction).where(Extraction.job_id == job_id)
+                existing_extraction = session.exec(statement).first()
+                
+                if existing_extraction:
+                    existing_extraction.keywords_json = keywords_json
+                    existing_extraction.must_have_json = must_have_json
+                    existing_extraction.nice_to_have_json = nice_to_have_json
+                    existing_extraction.years_required = extracted.get("years_required")
+                    existing_extraction.degree_required = extracted.get("degree_required")
+                    existing_extraction.certifications_json = certifications_json
+                    existing_extraction.summary = None
+                    existing_extraction.extraction_method = extraction_method
+                    existing_extraction.extracted_at = datetime.utcnow()
+                    session.add(existing_extraction)
+                else:
+                    extraction = Extraction(
+                        job_id=job_id,
+                        keywords_json=keywords_json,
+                        must_have_json=must_have_json,
+                        nice_to_have_json=nice_to_have_json,
+                        years_required=extracted.get("years_required"),
+                        degree_required=extracted.get("degree_required"),
+                        certifications_json=certifications_json,
+                        summary=None,
+                        extraction_method=extraction_method,
+                        extracted_at=datetime.utcnow()
+                    )
+                    session.add(extraction)
+                
+                session.commit()
+            except Exception as db_error:
+                print(f"保存提取结果到数据库失败: {db_error}")
+                import traceback
+                traceback.print_exc()
+                # 尝试回滚
+                try:
+                    session.rollback()
+                except:
+                    pass
+                # 重新抛出异常，让调用者知道失败
+                raise
+        except Exception as fallback_error:
+            print(f"规则提取也失败: {fallback_error}")
+            import traceback
+            traceback.print_exc()
+            # 如果规则提取也失败，抛出异常
+            raise

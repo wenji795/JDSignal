@@ -12,8 +12,9 @@ sys.path.insert(0, str(backend_dir))
 
 from sqlmodel import Session, select, create_engine
 from app.models import Job, Extraction
-from app.extractors.keyword_extractor import extract_and_save
+from app.extractors.keyword_extractor import extract_and_save_sync
 from app.database import create_db_and_tables
+import asyncio
 
 # 使用与主应用相同的数据库路径
 db_path = backend_dir / "jobs.db"
@@ -41,7 +42,15 @@ def re_extract_all_jobs():
                 print(f"\n[{i}/{len(jobs)}] 处理职位: {job.title[:60]}...")
                 
                 # 重新提取关键词（这会更新或创建Extraction记录）
-                extract_and_save(job.id, job.jd_text, session)
+                # 使用同步包装器，支持AI增强提取
+                extract_and_save_sync(
+                    job.id, 
+                    job.jd_text, 
+                    session,
+                    job_title=job.title,
+                    company=job.company,
+                    use_ai=True  # 启用AI增强提取
+                )
                 
                 # 获取提取结果以验证
                 extraction = session.exec(
@@ -50,7 +59,9 @@ def re_extract_all_jobs():
                 
                 if extraction:
                     keyword_count = len(extraction.keywords_json.get("keywords", []))
-                    print(f"  ✓ 成功提取 {keyword_count} 个关键词")
+                    method = extraction.extraction_method or "unknown"
+                    has_summary = "有摘要" if extraction.summary else "无摘要"
+                    print(f"  ✓ 成功提取 {keyword_count} 个关键词 ({method}, {has_summary})")
                     updated_count += 1
                 else:
                     print(f"  ✗ 警告: 提取结果未找到")

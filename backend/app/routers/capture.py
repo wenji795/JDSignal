@@ -93,6 +93,7 @@ def capture_job(capture_data: CaptureRequest, session: Session = Depends(get_ses
     session.refresh(job)
     
     # 运行提取并存储结果（支持AI增强）
+    extraction_success = False
     try:
         from app.extractors.keyword_extractor import extract_and_save_sync
         extract_and_save_sync(
@@ -104,19 +105,38 @@ def capture_job(capture_data: CaptureRequest, session: Session = Depends(get_ses
             use_ai=True
         )
         session.refresh(job)
+        extraction_success = True
     except Exception as e:
-        # 即使提取失败，也返回创建的职位
-        raise HTTPException(status_code=500, detail=f"Failed to extract keywords: {str(e)}")
+        # 记录详细错误信息
+        import traceback
+        error_detail = f"Failed to extract keywords: {str(e)}\n{traceback.format_exc()}"
+        print(f"提取关键词失败: {error_detail}")
+        # 即使提取失败，也继续处理（职位已创建）
+        # 尝试回滚可能的数据库更改
+        try:
+            session.rollback()
+        except:
+            pass
+        # 刷新job以确保状态正确
+        try:
+            session.refresh(job)
+        except:
+            pass
     
     # 获取提取结果
     extraction = session.exec(select(Extraction).where(Extraction.job_id == job.id)).first()
     
+    # 如果没有提取结果，返回空的关键词列表（职位已创建，但提取失败）
     if not extraction:
-        raise HTTPException(status_code=500, detail="Extraction not found after creation")
+        return CaptureResponse(
+            job_id=job.id,
+            top_keywords=[],
+            message="职位已创建，但关键词提取失败"
+        )
     
     # 获取top 20关键词
     keywords_data = extraction.keywords_json.get("keywords", [])
-    top_keywords = keywords_data[:20]  # 取前20个（已经按分数排序）
+    top_keywords = keywords_data[:20] if keywords_data else []  # 取前20个（已经按分数排序）
     
     return CaptureResponse(
         job_id=job.id,
