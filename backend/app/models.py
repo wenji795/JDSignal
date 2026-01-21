@@ -24,6 +24,9 @@ class Seniority(str, Enum):
     PRINCIPAL = "principal"
     LEAD = "lead"
     MANAGER = "manager"
+    ARCHITECT = "architect"
+    GRADUATE = "graduate"
+    UNKNOWN = "unknown"
 
 
 class Job(SQLModel, table=True):

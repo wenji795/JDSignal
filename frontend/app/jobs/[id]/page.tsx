@@ -102,13 +102,18 @@ export default function JobDetailPage() {
               </div>
             )}
             {job.seniority && (() => {
-              const displaySeniority = job.seniority === 'junior' && (job.title.toLowerCase().includes('graduate') || job.title.toLowerCase().includes('entry')) ? 'Graduate' :
+              const displaySeniority = job.seniority === 'graduate' ? 'Graduate' :
                                        job.seniority === 'junior' ? 'Junior' :
                                        job.seniority === 'mid' ? 'Intermediate' :
                                        job.seniority === 'senior' ? 'Senior' :
+                                       job.seniority === 'manager' ? 'Manager' :
+                                       job.seniority === 'lead' ? 'Lead' :
+                                       job.seniority === 'architect' ? 'Architect' :
+                                       job.seniority === 'unknown' ? '资历不明' :
                                        job.seniority;
               const colorKey = displaySeniority.toLowerCase() === 'graduate' ? 'graduate' :
                                displaySeniority.toLowerCase() === 'intermediate' ? 'intermediate' :
+                               displaySeniority.toLowerCase() === '资历不明' ? 'unknown' :
                                job.seniority;
               return (
                 <div>
@@ -118,6 +123,10 @@ export default function JobDetailPage() {
                     colorKey === 'junior' ? 'bg-yellow-100 text-yellow-900' :
                     colorKey === 'intermediate' || colorKey === 'mid' ? 'bg-amber-100 text-amber-900' :
                     colorKey === 'senior' ? 'bg-orange-100 text-orange-900' :
+                    colorKey === 'manager' ? 'bg-purple-100 text-purple-900' :
+                    colorKey === 'lead' ? 'bg-indigo-100 text-indigo-900' :
+                    colorKey === 'architect' ? 'bg-cyan-100 text-cyan-900' :
+                    colorKey === 'unknown' ? 'bg-gray-100 text-gray-900' :
                     'bg-gray-100 text-gray-900'
                   }`}>
                     {displaySeniority}

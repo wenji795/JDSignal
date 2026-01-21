@@ -86,7 +86,7 @@ def create_job(job_data: JobCreate, session: Session = Depends(get_session)):
 def list_jobs(
     status: Optional[JobStatus] = Query(None, description="按状态过滤"),
     role_family: Optional[str] = Query(None, description="按角色族过滤"),
-    seniority: Optional[str] = Query(None, description="按资历级别过滤（支持graduate/junior/intermediate/mid/senior）"),
+    seniority: Optional[str] = Query(None, description="按资历级别过滤（支持graduate/junior/intermediate/mid/senior/manager/lead/architect/unknown）"),
     keyword: Optional[str] = Query(None, description="关键词搜索（在jd_text中）"),
     location: Optional[str] = Query(None, description="按地点过滤（支持部分匹配，如'New Zealand'或'NZ'）"),
     session: Session = Depends(get_session)
@@ -103,11 +103,15 @@ def list_jobs(
     if seniority:
         # 映射前端的显示名称到实际的枚举值
         seniority_mapping = {
-            'graduate': Seniority.JUNIOR,
+            'graduate': Seniority.GRADUATE,
             'junior': Seniority.JUNIOR,
             'intermediate': Seniority.MID,
             'mid': Seniority.MID,
-            'senior': Seniority.SENIOR
+            'senior': Seniority.SENIOR,
+            'manager': Seniority.MANAGER,
+            'lead': Seniority.LEAD,
+            'architect': Seniority.ARCHITECT,
+            'unknown': Seniority.UNKNOWN
         }
         # 如果传入的是映射值，使用映射；否则尝试直接转换
         mapped_seniority = seniority_mapping.get(seniority.lower())

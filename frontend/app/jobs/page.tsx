@@ -32,15 +32,19 @@ export default function JobsPage() {
     'data': '数据',
     'mobile': '移动开发'
   }
-  // 只显示：graduate (映射到junior), junior, intermediate (映射到mid), senior
-  const seniorities = ['graduate', 'junior', 'intermediate', 'senior']
+  // 只显示：graduate, junior, intermediate (映射到mid), senior, manager, lead, architect, unknown
+  const seniorities = ['graduate', 'junior', 'intermediate', 'senior', 'manager', 'lead', 'architect', 'unknown']
   
   // 资历级别显示名称映射
   const seniorityLabels: Record<string, string> = {
     'graduate': 'Graduate',
     'junior': 'Junior',
     'intermediate': 'Intermediate',
-    'senior': 'Senior'
+    'senior': 'Senior',
+    'manager': 'Manager',
+    'lead': 'Lead',
+    'architect': 'Architect',
+    'unknown': '资历不明'
   }
   
   // 角色族颜色映射（深色背景+白色文字）
@@ -59,6 +63,10 @@ export default function JobsPage() {
     'junior': 'bg-yellow-100 text-yellow-900',
     'intermediate': 'bg-amber-100 text-amber-900',
     'senior': 'bg-orange-100 text-orange-900',
+    'manager': 'bg-purple-100 text-purple-900',
+    'lead': 'bg-indigo-100 text-indigo-900',
+    'architect': 'bg-cyan-100 text-cyan-900',
+    'unknown': 'bg-gray-100 text-gray-900',
     'mid': 'bg-amber-100 text-amber-900' // intermediate的映射
   }
 
@@ -164,7 +172,7 @@ export default function JobsPage() {
           >
             <option value="">全部</option>
             {seniorities.map(s => (
-              <option key={s} value={s === 'graduate' ? 'junior' : s === 'intermediate' ? 'mid' : s}>
+              <option key={s} value={s === 'intermediate' ? 'mid' : s}>
                 {seniorityLabels[s] || s}
               </option>
             ))}
@@ -209,13 +217,18 @@ export default function JobsPage() {
                       </span>
                     )}
                     {job.seniority && (() => {
-                      const displaySeniority = job.seniority === 'junior' && (job.title.toLowerCase().includes('graduate') || job.title.toLowerCase().includes('entry')) ? 'Graduate' :
+                      const displaySeniority = job.seniority === 'graduate' ? 'Graduate' :
                                                job.seniority === 'junior' ? 'Junior' :
                                                job.seniority === 'mid' ? 'Intermediate' :
                                                job.seniority === 'senior' ? 'Senior' :
+                                               job.seniority === 'manager' ? 'Manager' :
+                                               job.seniority === 'lead' ? 'Lead' :
+                                               job.seniority === 'architect' ? 'Architect' :
+                                               job.seniority === 'unknown' ? '资历不明' :
                                                job.seniority;
                       const colorKey = displaySeniority.toLowerCase() === 'graduate' ? 'graduate' :
                                        displaySeniority.toLowerCase() === 'intermediate' ? 'intermediate' :
+                                       displaySeniority.toLowerCase() === '资历不明' ? 'unknown' :
                                        job.seniority;
                       return (
                         <span className={`px-2 py-1 rounded text-xs font-medium ${seniorityColors[colorKey] || 'bg-gray-100 text-gray-900'}`}>
