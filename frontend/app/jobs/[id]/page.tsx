@@ -92,9 +92,11 @@ export default function JobDetailPage() {
                   job.role_family === 'testing' ? 'bg-pink-600 text-white' :
                   job.role_family === 'ai' ? 'bg-purple-600 text-white' :
                   job.role_family === 'fullstack' ? 'bg-indigo-600 text-white' :
+                  job.role_family === 'frontend' ? 'bg-cyan-600 text-white' :
                   job.role_family === 'devops' ? 'bg-emerald-600 text-white' :
                   job.role_family === 'data' ? 'bg-blue-600 text-white' :
                   job.role_family === 'mobile' ? 'bg-teal-600 text-white' :
+                  job.role_family === '其他' ? 'bg-gray-600 text-white' :
                   'bg-gray-600 text-white'
                 }`}>
                   {job.role_family}

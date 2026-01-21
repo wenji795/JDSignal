@@ -73,7 +73,7 @@ async def extract_with_ai(
 注意：
 - keywords 包含所有技术关键词
 - must_have_keywords 和 nice_to_have_keywords 是 keywords 的子集
-- role_family 必须是以下之一：fullstack, backend, frontend, devops, data, mobile, qa, security, other
+- role_family 必须是以下之一：fullstack, backend, frontend, devops, data, mobile, qa, security, testing, ai, 其他, other
 - seniority 必须是以下之一：graduate, junior, intermediate, senior, lead, architect, manager, unknown
 - 如果信息不明确，使用 null 或 "unknown"
 - summary 应该是2-3句话的简洁摘要，突出关键要求"""
@@ -162,7 +162,7 @@ def _normalize_ai_result(result: Dict[str, Any]) -> Dict[str, Any]:
     # 验证 role_family
     valid_role_families = {
         "fullstack", "backend", "frontend", "devops", "data", 
-        "mobile", "qa", "security", "other", "unknown"
+        "mobile", "qa", "security", "testing", "ai", "其他", "other", "unknown"
     }
     if normalized["role_family"] not in valid_role_families:
         normalized["role_family"] = "unknown"

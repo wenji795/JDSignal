@@ -9,9 +9,11 @@ const roleFamilyColors: Record<string, string> = {
   'testing': '#db2777',    // pink-600
   'ai': '#9333ea',         // purple-600
   'fullstack': '#4f46e5',  // indigo-600
+  'frontend': '#0891b2',   // cyan-600
   'devops': '#059669',      // emerald-600
   'data': '#2563eb',        // blue-600
-  'mobile': '#0d9488'       // teal-600
+  'mobile': '#0d9488',      // teal-600
+  '其他': '#6b7280'         // gray-500
 }
 
 // 资历级别颜色映射（与jobs页面保持一致）
@@ -50,9 +52,11 @@ export default function TrendsPage() {
     { value: 'testing', label: '软件测试' },
     { value: 'ai', label: 'AI/机器学习' },
     { value: 'fullstack', label: '全栈' },
+    { value: 'frontend', label: '前端/UI/UX' },
     { value: 'devops', label: 'DevOps' },
     { value: 'data', label: '数据' },
-    { value: 'mobile', label: '移动开发' }
+    { value: 'mobile', label: '移动开发' },
+    { value: '其他', label: '其他' }
   ]
   
   // 角色族中文显示名称映射
@@ -60,9 +64,11 @@ export default function TrendsPage() {
     'testing': '软件测试',
     'ai': 'AI/机器学习',
     'fullstack': '全栈',
+    'frontend': '前端/UI/UX',
     'devops': 'DevOps',
     'data': '数据',
-    'mobile': '移动开发'
+    'mobile': '移动开发',
+    '其他': '其他'
   }
 
   useEffect(() => {

@@ -22,38 +22,65 @@ DATABASE_URL = f"sqlite:///{db_path}"
 engine = create_engine(DATABASE_URL, connect_args={"check_same_thread": False})
 
 
-def update_all_jobs():
-    """更新所有职位的role_family和seniority"""
+def update_all_jobs(force_update: bool = True):
+    """
+    更新所有职位的role_family和seniority
+    
+    Args:
+        force_update: 如果为True，强制更新所有职位（即使已有值）；如果为False，只更新空值
+    """
     # 确保数据库表存在
     create_db_and_tables()
     
     with Session(engine) as session:
-        # 获取所有没有role_family或seniority的职位
+        # 获取所有职位
         jobs = session.exec(select(Job)).all()
         
-        updated_count = 0
+        updated_role_family_count = 0
+        updated_seniority_count = 0
         
         for job in jobs:
             # 推断role_family和seniority
-            role_family, seniority = infer_role_and_seniority(job.title, job.jd_text)
+            new_role_family, new_seniority = infer_role_and_seniority(job.title, job.jd_text)
             
-            # 如果推断出结果且与现有值不同，则更新
-            if role_family and job.role_family != role_family:
-                job.role_family = role_family
-                updated_count += 1
-                print(f"✓ 更新 {job.title[:50]}... role_family: {job.role_family} -> {role_family}")
+            # 更新role_family
+            if new_role_family:
+                if force_update or not job.role_family or job.role_family != new_role_family:
+                    old_role_family = job.role_family
+                    job.role_family = new_role_family
+                    updated_role_family_count += 1
+                    print(f"✓ 更新 {job.title[:50]}... role_family: {old_role_family} -> {new_role_family}")
             
-            if seniority and job.seniority != seniority:
-                job.seniority = seniority
-                updated_count += 1
-                print(f"✓ 更新 {job.title[:50]}... seniority: {job.seniority} -> {seniority}")
+            # 更新seniority
+            if new_seniority:
+                if force_update or not job.seniority or job.seniority != new_seniority:
+                    old_seniority = job.seniority
+                    job.seniority = new_seniority
+                    updated_seniority_count += 1
+                    print(f"✓ 更新 {job.title[:50]}... seniority: {old_seniority} -> {new_seniority}")
             
             session.add(job)
         
         session.commit()
-        print(f"\n完成！共更新 {updated_count} 个字段")
+        print(f"\n完成！共更新 {updated_role_family_count} 个role_family字段，{updated_seniority_count} 个seniority字段")
 
 
 if __name__ == "__main__":
+    import argparse
+    
+    parser = argparse.ArgumentParser(description="更新已有职位的role_family和seniority")
+    parser.add_argument(
+        "--force",
+        action="store_true",
+        help="强制更新所有职位（即使已有值），默认只更新空值"
+    )
+    
+    args = parser.parse_args()
+    
     print("开始更新已有职位的role_family和seniority...")
-    update_all_jobs()
+    if args.force:
+        print("模式：强制更新所有职位")
+    else:
+        print("模式：只更新空值")
+    
+    update_all_jobs(force_update=args.force)

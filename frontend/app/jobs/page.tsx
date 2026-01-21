@@ -18,9 +18,11 @@ export default function JobsPage() {
     'testing',  // 软件测试（用户最关心）
     'ai',       // AI/机器学习
     'fullstack', 
+    'frontend', // 前端/UI/UX
     'devops', 
     'data',
-    'mobile'
+    'mobile',
+    '其他'      // 其他角色
   ]
   
   // 角色族中文显示名称
@@ -28,9 +30,11 @@ export default function JobsPage() {
     'testing': '软件测试',
     'ai': 'AI/机器学习',
     'fullstack': '全栈',
+    'frontend': '前端/UI/UX',
     'devops': 'DevOps',
     'data': '数据',
-    'mobile': '移动开发'
+    'mobile': '移动开发',
+    '其他': '其他'
   }
   // 只显示：graduate, junior, intermediate (映射到mid), senior, manager, lead, architect, unknown
   const seniorities = ['graduate', 'junior', 'intermediate', 'senior', 'manager', 'lead', 'architect', 'unknown']
@@ -52,9 +56,11 @@ export default function JobsPage() {
     'testing': 'bg-pink-600 text-white',
     'ai': 'bg-purple-600 text-white',
     'fullstack': 'bg-indigo-600 text-white',
+    'frontend': 'bg-cyan-600 text-white',
     'devops': 'bg-emerald-600 text-white',
     'data': 'bg-blue-600 text-white',
-    'mobile': 'bg-teal-600 text-white'
+    'mobile': 'bg-teal-600 text-white',
+    '其他': 'bg-gray-600 text-white'
   }
   
   // 资历级别颜色映射（浅色背景+深色文字）

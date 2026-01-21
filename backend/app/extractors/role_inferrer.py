@@ -50,10 +50,14 @@ def infer_role_family(title: str, jd_text: str = "") -> Optional[str]:
         'ruby developer', 'scala developer'
     ]
     
-    # 前端相关关键词（标题优先）
+    # 前端相关关键词（标题优先，包括UI/UX）
     frontend_title_keywords = [
         'frontend engineer', 'frontend developer', 'front-end engineer', 'front-end developer',
-        'ui developer', 'ux developer', 'ui engineer',
+        'ui developer', 'ux developer', 'ui engineer', 'ux engineer',
+        'ui/ux developer', 'ui/ux engineer', 'ui ux developer', 'ui ux engineer',
+        'ui designer', 'ux designer', 'ui/ux designer', 'ui ux designer',
+        'user interface developer', 'user experience developer',
+        'user interface engineer', 'user experience engineer',
         'react developer', 'vue developer', 'angular developer',
         'javascript developer', 'typescript developer', 'web developer'
     ]
@@ -105,9 +109,9 @@ def infer_role_family(title: str, jd_text: str = "") -> Optional[str]:
     if any(keyword in title_lower for keyword in backend_title_keywords):
         return 'fullstack'
     
-    # 前端岗位 - 统一归类为全栈
+    # 前端岗位（包括UI/UX）- 归类为frontend
     if any(keyword in title_lower for keyword in frontend_title_keywords):
-        return 'fullstack'
+        return 'frontend'
     
     # DevOps岗位
     if any(keyword in title_lower for keyword in devops_title_keywords):
@@ -147,7 +151,7 @@ def infer_role_family(title: str, jd_text: str = "") -> Optional[str]:
         elif any(keyword in jd_tech_text for keyword in backend_tech_keywords):
             return 'fullstack'  # 后端统一归类为全栈
         elif any(keyword in jd_tech_text for keyword in frontend_tech_keywords):
-            return 'fullstack'  # 前端统一归类为全栈
+            return 'frontend'  # 前端归类为frontend
         else:
             # 默认推断为全栈
             return 'fullstack'
@@ -168,7 +172,7 @@ def infer_role_family(title: str, jd_text: str = "") -> Optional[str]:
         if any(keyword in jd_lower for keyword in backend_title_keywords):
             return 'fullstack'  # 后端统一归类为全栈
         if any(keyword in jd_lower for keyword in frontend_title_keywords):
-            return 'fullstack'  # 前端统一归类为全栈
+            return 'frontend'  # 前端归类为frontend
         if any(keyword in jd_lower for keyword in devops_title_keywords):
             return 'devops'
         if any(keyword in jd_lower for keyword in data_title_keywords):
@@ -176,7 +180,8 @@ def infer_role_family(title: str, jd_text: str = "") -> Optional[str]:
         if any(keyword in jd_lower for keyword in mobile_title_keywords):
             return 'mobile'
     
-    return None
+    # 如果无法匹配任何角色族，返回"其他"
+    return '其他'
 
 
 def infer_seniority(title: str, jd_text: str = "") -> Optional[Seniority]:
