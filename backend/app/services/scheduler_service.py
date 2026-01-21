@@ -2,11 +2,13 @@
 try:
     from apscheduler.schedulers.asyncio import AsyncIOScheduler
     from apscheduler.triggers.cron import CronTrigger
+    from datetime import datetime
     APSCHEDULER_AVAILABLE = True
 except ImportError:
     APSCHEDULER_AVAILABLE = False
     AsyncIOScheduler = None
     CronTrigger = None
+    datetime = None
 
 import asyncio
 
@@ -105,6 +107,18 @@ def start_scheduler():
     print("✓ 定时任务调度器已启动")
     print("  - 每小时自动抓取新西兰职位（每小时的第0分钟）")
     print("  - 每天自动清理6个月前的数据（每天凌晨2点）")
+    
+    # 启动时立即执行一次抓取任务（使用scheduler添加一次性任务）
+    print("  - 正在启动时立即执行一次抓取任务...")
+    scheduler.add_job(
+        run_scraper,
+        trigger='date',
+        run_date=datetime.now(),  # 立即执行
+        id='startup_scrape',
+        name='启动时立即抓取',
+        max_instances=1,
+        replace_existing=True
+    )
 
 
 def stop_scheduler():
