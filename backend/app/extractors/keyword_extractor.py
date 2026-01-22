@@ -720,40 +720,48 @@ async def extract_and_save(
         
         extraction_method = "ai-enhanced" if extracted.get("extraction_method") != "rule-based" else "rule-based"
         
-        # 如果AI提取成功且提供了角色族和资历级别，更新Job模型
-        if extraction_method == "ai-enhanced" and extracted.get("role_family"):
-            job = session.get(Job, job_id)
-            if job:
-                if extracted.get("role_family") and extracted["role_family"] != "unknown":
-                    job.role_family = extracted["role_family"]
-                if extracted.get("seniority") and extracted["seniority"] != "unknown":
-                    # 映射到Seniority枚举
-                    seniority_map = {
-                        "graduate": "graduate",
-                        "junior": "junior",
-                        "intermediate": "mid",
-                        "senior": "senior",
-                        "lead": "lead",
-                        "architect": "architect",
-                        "manager": "manager"
-                    }
-                    seniority_value = seniority_map.get(extracted["seniority"])
-                    if seniority_value:
-                        from app.models import Seniority
-                        try:
-                            job.seniority = Seniority(seniority_value)
-                        except ValueError:
-                            pass
-                # 如果AI提取到了posted_date且job还没有posted_date，更新它
-                if extracted.get("posted_date") and not job.posted_date:
+        # 更新Job模型的角色族、资历级别和发布日期（无论使用AI还是规则提取）
+        job = session.get(Job, job_id)
+        if job:
+            # 更新角色族（如果提取到了且不是unknown）
+            if extracted.get("role_family") and extracted["role_family"] not in ["unknown", "other", "其他", None]:
+                job.role_family = extracted["role_family"]
+            
+            # 更新资历级别（如果提取到了且不是unknown）
+            if extracted.get("seniority") and extracted["seniority"] != "unknown":
+                # 映射到Seniority枚举
+                seniority_map = {
+                    "graduate": "graduate",
+                    "junior": "junior",
+                    "intermediate": "mid",
+                    "mid": "mid",
+                    "senior": "senior",
+                    "lead": "lead",
+                    "architect": "architect",
+                    "manager": "manager",
+                    "principal": "principal",
+                    "staff": "staff"
+                }
+                seniority_value = seniority_map.get(extracted["seniority"].lower())
+                if seniority_value:
+                    from app.models import Seniority
                     try:
-                        posted_date_str = extracted.get("posted_date")
-                        if isinstance(posted_date_str, str):
-                            posted_date = datetime.fromisoformat(posted_date_str.replace('Z', '+00:00'))
-                            job.posted_date = posted_date
-                    except Exception as e:
-                        print(f"解析AI提取的posted_date失败: {e}")
-                session.add(job)
+                        job.seniority = Seniority(seniority_value)
+                    except ValueError:
+                        pass
+            
+            # 更新发布日期（如果提取到了且job还没有posted_date）
+            if extracted.get("posted_date") and not job.posted_date:
+                try:
+                    posted_date_str = extracted.get("posted_date")
+                    if isinstance(posted_date_str, str):
+                        # 尝试解析日期字符串
+                        posted_date = datetime.fromisoformat(posted_date_str.replace('Z', '+00:00'))
+                        job.posted_date = posted_date
+                except Exception as e:
+                    print(f"解析提取的posted_date失败: {e}")
+            
+            session.add(job)
         
     except Exception as e:
         # 如果AI提取失败，回退到规则提取

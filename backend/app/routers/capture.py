@@ -31,7 +31,7 @@ router = APIRouter(prefix="/capture", tags=["capture"])
     - 返回创建的job_id和top 20关键词
     """
 )
-def capture_job(capture_data: CaptureRequest, session: Session = Depends(get_session)):
+async def capture_job(capture_data: CaptureRequest, session: Session = Depends(get_session)):
     """
     捕获职位信息
     
@@ -60,12 +60,11 @@ def capture_job(capture_data: CaptureRequest, session: Session = Depends(get_ses
     captured_at = capture_data.captured_at if capture_data.captured_at else datetime.utcnow()
     
     # 自动推断role_family和seniority（AI优先）
-    import asyncio
-    role_family, seniority = asyncio.run(infer_role_and_seniority_with_ai(
+    role_family, seniority = await infer_role_and_seniority_with_ai(
         capture_data.page_title,
         capture_data.extracted_text,
         use_ai=True
-    ))
+    )
     
     # 使用page_title作为title，company_guess作为company
     # 如果 company_guess 为空或 "Unknown"，则不设置 company 字段（让它为 None）
@@ -98,8 +97,7 @@ def capture_job(capture_data: CaptureRequest, session: Session = Depends(get_ses
     # 运行提取并存储结果（支持AI增强）
     extraction_success = False
     try:
-        from app.extractors.keyword_extractor import extract_and_save_sync
-        extract_and_save_sync(
+        await extract_and_save(
             job.id, 
             job.jd_text, 
             session,

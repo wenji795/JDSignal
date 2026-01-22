@@ -213,7 +213,7 @@ async def extract_keywords_hybrid(
     use_ai: bool = True
 ) -> Dict[str, Any]:
     """
-    混合提取：优先使用AI，失败时回退到规则提取
+    混合提取：优先使用AI，AI找不到的字段用代码逻辑兜底
     
     Args:
         jd_text: 职位描述文本
@@ -224,29 +224,142 @@ async def extract_keywords_hybrid(
     Returns:
         提取结果字典
     """
+    # 初始化结果
+    result = {
+        "keywords": [],
+        "must_have_keywords": [],
+        "nice_to_have_keywords": [],
+        "role_family": None,
+        "seniority": None,
+        "years_required": None,
+        "degree_required": None,
+        "certifications": [],
+        "summary": "",
+        "posted_date": None,
+        "success": True,
+        "extraction_method": "rule-based"
+    }
+    
     # 如果启用AI且客户端可用，尝试AI提取
+    ai_result = None
     if use_ai:
         ai_result = await extract_with_ai(jd_text, job_title, company)
         
         if ai_result.get("success"):
-            return ai_result
+            # AI提取成功，使用AI的结果
+            result.update({
+                "keywords": ai_result.get("keywords", []),
+                "must_have_keywords": ai_result.get("must_have_keywords", []),
+                "nice_to_have_keywords": ai_result.get("nice_to_have_keywords", []),
+                "years_required": ai_result.get("years_required"),
+                "degree_required": ai_result.get("degree_required"),
+                "certifications": ai_result.get("certifications", []),
+                "summary": ai_result.get("summary", ""),
+                "extraction_method": "ai-enhanced"
+            })
+            
+            # 角色族：AI优先，如果AI返回unknown/other/None，使用代码逻辑兜底
+            ai_role_family = ai_result.get("role_family")
+            if ai_role_family and ai_role_family not in ["unknown", "other", "其他", None]:
+                result["role_family"] = ai_role_family
+            else:
+                # AI找不到，使用代码逻辑兜底
+                from app.extractors.role_inferrer import infer_role_family
+                fallback_role_family = infer_role_family(job_title or "", jd_text)
+                result["role_family"] = fallback_role_family
+            
+            # 资历级别：AI优先，如果AI返回unknown/None，使用代码逻辑兜底
+            ai_seniority = ai_result.get("seniority")
+            if ai_seniority and ai_seniority != "unknown":
+                result["seniority"] = ai_seniority
+            else:
+                # AI找不到，使用代码逻辑兜底
+                from app.extractors.role_inferrer import infer_seniority
+                from app.models import Seniority
+                fallback_seniority = infer_seniority(job_title or "", jd_text)
+                if fallback_seniority:
+                    # 映射到字符串格式
+                    seniority_map = {
+                        Seniority.GRADUATE: "graduate",
+                        Seniority.JUNIOR: "junior",
+                        Seniority.MID: "intermediate",
+                        Seniority.SENIOR: "senior",
+                        Seniority.LEAD: "lead",
+                        Seniority.ARCHITECT: "architect",
+                        Seniority.MANAGER: "manager",
+                        Seniority.PRINCIPAL: "principal",
+                        Seniority.STAFF: "staff",
+                        Seniority.UNKNOWN: "unknown"
+                    }
+                    result["seniority"] = seniority_map.get(fallback_seniority, "unknown")
+            
+            # 发布日期：AI优先，如果AI返回None，使用代码逻辑兜底
+            ai_posted_date = ai_result.get("posted_date")
+            if ai_posted_date:
+                result["posted_date"] = ai_posted_date
+            else:
+                # AI找不到，使用代码逻辑兜底
+                try:
+                    from app.extractors.date_extractor import extract_posted_date_from_text
+                    fallback_posted_date = extract_posted_date_from_text(jd_text)
+                    if fallback_posted_date:
+                        # 转换为字符串格式
+                        if hasattr(fallback_posted_date, 'strftime'):
+                            result["posted_date"] = fallback_posted_date.strftime('%Y-%m-%d')
+                        else:
+                            result["posted_date"] = str(fallback_posted_date)
+                except Exception as e:
+                    print(f"使用代码逻辑提取posted_date失败: {e}")
     
-    # 回退到规则提取
-    from app.extractors.keyword_extractor import extract_keywords
+    # 如果AI提取失败或未启用AI，完全使用规则提取
+    if not ai_result or not ai_result.get("success"):
+        from app.extractors.keyword_extractor import extract_keywords
+        from app.extractors.role_inferrer import infer_role_family, infer_seniority
+        from app.models import Seniority
+        
+        rule_result = extract_keywords(jd_text)
+        
+        # 使用规则提取的结果
+        result.update({
+            "keywords": [kw["term"] for kw in rule_result.get("keywords", [])],
+            "must_have_keywords": rule_result.get("must_have_keywords", []),
+            "nice_to_have_keywords": rule_result.get("nice_to_have_keywords", []),
+            "years_required": rule_result.get("years_required"),
+            "degree_required": rule_result.get("degree_required"),
+            "certifications": rule_result.get("certifications", []),
+            "summary": "",
+            "extraction_method": "rule-based"
+        })
+        
+        # 使用代码逻辑推断角色族和资历级别
+        if job_title:
+            result["role_family"] = infer_role_family(job_title, jd_text)
+            fallback_seniority = infer_seniority(job_title, jd_text)
+            if fallback_seniority:
+                seniority_map = {
+                    Seniority.GRADUATE: "graduate",
+                    Seniority.JUNIOR: "junior",
+                    Seniority.MID: "intermediate",
+                    Seniority.SENIOR: "senior",
+                    Seniority.LEAD: "lead",
+                    Seniority.ARCHITECT: "architect",
+                    Seniority.MANAGER: "manager",
+                    Seniority.PRINCIPAL: "principal",
+                    Seniority.STAFF: "staff",
+                    Seniority.UNKNOWN: "unknown"
+                }
+                result["seniority"] = seniority_map.get(fallback_seniority, "unknown")
+        
+        # 使用代码逻辑提取发布日期
+        try:
+            from app.extractors.date_extractor import extract_posted_date_from_text
+            fallback_posted_date = extract_posted_date_from_text(jd_text)
+            if fallback_posted_date:
+                if hasattr(fallback_posted_date, 'strftime'):
+                    result["posted_date"] = fallback_posted_date.strftime('%Y-%m-%d')
+                else:
+                    result["posted_date"] = str(fallback_posted_date)
+        except Exception as e:
+            print(f"使用代码逻辑提取posted_date失败: {e}")
     
-    rule_result = extract_keywords(jd_text)
-    
-    # 转换为统一格式
-    return {
-        "keywords": [kw["term"] for kw in rule_result.get("keywords", [])],
-        "must_have_keywords": rule_result.get("must_have_keywords", []),
-        "nice_to_have_keywords": rule_result.get("nice_to_have_keywords", []),
-        "role_family": None,  # 规则提取不提供角色族
-        "seniority": None,  # 规则提取不提供资历级别
-        "years_required": rule_result.get("years_required"),
-        "degree_required": rule_result.get("degree_required"),
-        "certifications": rule_result.get("certifications", []),
-        "summary": "",  # 规则提取不提供摘要
-        "success": True,
-        "extraction_method": "rule-based"
-    }
+    return result
