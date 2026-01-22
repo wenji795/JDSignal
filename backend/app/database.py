@@ -31,7 +31,8 @@ else:
 db_absolute_path = str(db_path.absolute())
 # 确保路径格式正确（SQLite 需要绝对路径）
 # 添加 mode=rwc 参数确保读写权限
-DATABASE_URL = f"sqlite:///{db_absolute_path}?mode=rwc"
+# 注意：SQLAlchemy 需要 uri=true 才能正确解析查询参数
+DATABASE_URL = f"sqlite:///{db_absolute_path}?mode=rwc&uri=true"
 
 # 创建数据库引擎
 # 添加更多连接参数以确保可以写入

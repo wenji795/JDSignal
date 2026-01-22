@@ -19,8 +19,10 @@ cat .env
 
 ```bash
 cd backend
-echo "AI_BUILDER_TOKEN=sk_44cb1c79_94bae8042e317d3992f618e8d97242f378a5" > .env
+echo "AI_BUILDER_TOKEN=your_token_here" > .env
 ```
+
+**重要**：将 `your_token_here` 替换为你的实际 AI Builder Token。请确保 `.env` 文件在 `.gitignore` 中，不要提交到版本控制。
 
 ### 2. 启动后端服务（终端1）
 
