@@ -168,6 +168,7 @@ class CaptureRequest(BaseModel):
     location_guess: Optional[str] = Field(None, description="推测的工作地点", examples=["San Francisco, CA"])
     extracted_text: str = Field(..., description="用户主动提取的文本（DOM提取或选中文本）", examples=["We are looking for a Senior Python Developer..."])
     captured_at: Optional[datetime] = Field(None, description="捕获时间（如果不提供则使用当前时间）")
+    posted_date: Optional[datetime] = Field(None, description="职位发布日期（如果可用）")
     
     model_config = {
         "json_schema_extra": {

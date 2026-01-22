@@ -3,10 +3,11 @@ import sys
 import asyncio
 import re
 from pathlib import Path
-from datetime import datetime
+from datetime import datetime, timedelta
 from typing import Optional, Dict, Any
 import json
 from urllib.parse import quote_plus
+from dateutil import parser as date_parser
 
 # 添加项目根目录到Python路径
 backend_dir = Path(__file__).parent.parent
@@ -18,6 +19,132 @@ import httpx
 API_BASE_URL = "http://127.0.0.1:8000"
 
 
+def parse_posted_date(date_text: str) -> Optional[datetime]:
+    """
+    解析发布日期文本，支持多种格式
+    例如: "Posted 25d ago", "Posted 2 weeks ago", "Posted 21/01/2026", etc.
+    """
+    if not date_text:
+        return None
+    
+    date_text = date_text.strip().lower()
+    
+    # 移除"Posted"前缀
+    date_text = re.sub(r'^posted\s+', '', date_text, flags=re.IGNORECASE)
+    date_text = date_text.strip()
+    
+    # 尝试解析相对时间格式 (e.g., "25d ago", "13d ago", "2 weeks ago", "1 month ago")
+    # 注意：Seek常用格式是 "Posted 13d ago"
+    relative_patterns = [
+        (r'(\d+)\s*d\s*ago', lambda m: datetime.utcnow() - timedelta(days=int(m.group(1)))),  # "13d ago", "25d ago"
+        (r'(\d+)\s*day\s*ago', lambda m: datetime.utcnow() - timedelta(days=int(m.group(1)))),  # "13 days ago"
+        (r'(\d+)\s*days?\s*ago', lambda m: datetime.utcnow() - timedelta(days=int(m.group(1)))),  # "13 days ago"
+        (r'(\d+)\s*w\s*ago', lambda m: datetime.utcnow() - timedelta(weeks=int(m.group(1)))),  # "2w ago"
+        (r'(\d+)\s*week\s*ago', lambda m: datetime.utcnow() - timedelta(weeks=int(m.group(1)))),  # "2 weeks ago"
+        (r'(\d+)\s*weeks?\s*ago', lambda m: datetime.utcnow() - timedelta(weeks=int(m.group(1)))),  # "2 weeks ago"
+        (r'(\d+)\s*m\s*ago', lambda m: datetime.utcnow() - timedelta(days=int(m.group(1)) * 30)),  # "1m ago"
+        (r'(\d+)\s*month\s*ago', lambda m: datetime.utcnow() - timedelta(days=int(m.group(1)) * 30)),  # "1 month ago"
+        (r'(\d+)\s*months?\s*ago', lambda m: datetime.utcnow() - timedelta(days=int(m.group(1)) * 30)),  # "1 month ago"
+        (r'(\d+)\s*h\s*ago', lambda m: datetime.utcnow() - timedelta(hours=int(m.group(1)))),  # "2h ago"
+        (r'(\d+)\s*hour\s*ago', lambda m: datetime.utcnow() - timedelta(hours=int(m.group(1)))),  # "2 hours ago"
+        (r'(\d+)\s*hours?\s*ago', lambda m: datetime.utcnow() - timedelta(hours=int(m.group(1)))),  # "2 hours ago"
+        (r'(\d+)\s*minute\s*ago', lambda m: datetime.utcnow() - timedelta(minutes=int(m.group(1)))),
+        (r'(\d+)\s*minutes?\s*ago', lambda m: datetime.utcnow() - timedelta(minutes=int(m.group(1)))),
+    ]
+    
+    for pattern, func in relative_patterns:
+        match = re.search(pattern, date_text)
+        if match:
+            try:
+                return func(match)
+            except:
+                continue
+    
+    # 尝试解析绝对日期格式 (e.g., "21/01/2026", "2026-01-21", "Jan 21, 2026")
+    try:
+        # 尝试使用dateutil解析
+        parsed = date_parser.parse(date_text, dayfirst=True)
+        return parsed
+    except:
+        pass
+    
+    # 尝试常见的日期格式
+    date_formats = [
+        '%d/%m/%Y',
+        '%Y-%m-%d',
+        '%d-%m-%Y',
+        '%m/%d/%Y',
+        '%d %B %Y',
+        '%B %d, %Y',
+        '%d %b %Y',
+        '%b %d, %Y',
+    ]
+    
+    for fmt in date_formats:
+        try:
+            return datetime.strptime(date_text, fmt)
+        except:
+            continue
+    
+    return None
+
+
+def extract_posted_date_from_text(text: str) -> Optional[datetime]:
+    """
+    从页面文本中提取发布日期
+    查找包含"Posted"、"posted"、"Date posted"等关键词的文本
+    优先匹配Seek格式："Posted 13d ago"
+    """
+    if not text:
+        return None
+    
+    # 优先查找Seek格式："Posted Xd ago" 或 "Posted X days ago"
+    seek_patterns = [
+        r'posted\s+(\d+\s*[dwmyh])\s*ago',  # "Posted 13d ago", "Posted 2w ago"
+        r'posted\s+(\d+\s*(?:day|days|week|weeks|month|months|hour|hours|minute|minutes))\s*ago',  # "Posted 13 days ago"
+    ]
+    
+    for pattern in seek_patterns:
+        matches = re.finditer(pattern, text, re.IGNORECASE)
+        for match in matches:
+            try:
+                # 提取包含"Posted"的完整文本
+                full_match = match.group(0)
+                date = parse_posted_date(full_match)
+                if date:
+                    return date
+            except:
+                continue
+    
+    # 查找包含"Posted"的行
+    lines = text.split('\n')
+    for line in lines:
+        line_lower = line.lower().strip()
+        if 'posted' in line_lower or 'date posted' in line_lower:
+            # 尝试从这一行提取日期
+            date = parse_posted_date(line)
+            if date:
+                return date
+    
+    # 查找常见的日期模式
+    date_patterns = [
+        r'posted\s+(\d{1,2}[/-]\d{1,2}[/-]\d{2,4})',
+        r'posted\s+(\d{1,2}\s+\w+\s+\d{4})',
+        r'(\d{1,2}[/-]\d{1,2}[/-]\d{2,4})',  # 通用日期格式
+    ]
+    
+    for pattern in date_patterns:
+        matches = re.finditer(pattern, text, re.IGNORECASE)
+        for match in matches:
+            try:
+                date_str = match.group(1) if match.groups() else match.group(0)
+                date = parse_posted_date(date_str)
+                if date:
+                    return date
+            except:
+                continue
+    
+    return None
 
 
 async def scrape_seek_job(page: Page, job_url: str) -> Optional[Dict[str, Any]]:
@@ -327,6 +454,182 @@ async def scrape_seek_job(page: Page, job_url: str) -> Optional[Dict[str, Any]]:
                     break
             except:
                 continue
+        
+        # 提取发布日期 (posted_date) - 优先提取Seek页面上的"Posted Xd ago"
+        posted_date = None
+        
+        # 方法1: 使用JavaScript查找包含"Posted"的元素（Seek常见格式）
+        try:
+            posted_date_text = await page.evaluate(r'''() => {
+                // 方法1a: 使用TreeWalker查找文本节点
+                const walker = document.createTreeWalker(
+                    document.body,
+                    NodeFilter.SHOW_TEXT,
+                    null,
+                    false
+                );
+                
+                let node;
+                while (node = walker.nextNode()) {
+                    const text = node.textContent.trim();
+                    // 匹配 "Posted Xd ago" 或 "Posted X days ago" 等格式
+                    if (/posted\s+\d+\s*[dwmyh]\s*ago/i.test(text)) {
+                        let parent = node.parentElement;
+                        while (parent && parent !== document.body) {
+                            const parentText = parent.textContent.trim();
+                            const match = parentText.match(/posted\s+(\d+\s*[dwmyh])\s*ago/i);
+                            if (match) {
+                                return parentText;
+                            }
+                            parent = parent.parentElement;
+                        }
+                        return text;
+                    }
+                }
+                
+                    // 方法1b: 查找所有包含"Posted"的元素（更宽松的匹配）
+                    const allElements = document.querySelectorAll('*');
+                    for (let el of allElements) {
+                        const text = el.textContent || el.innerText || '';
+                        // 匹配各种格式：Posted Xd ago, Posted X days ago, Posted Xd, etc.
+                        if (/posted\s+\d+\s*[dwmyh]/i.test(text) || /posted\s+\d+\s*(?:day|days|week|weeks|month|months)/i.test(text)) {
+                            // 尝试提取完整的"Posted Xd ago"文本
+                            const match = text.match(/posted\s+\d+\s*[dwmyh]\s*ago/i) || 
+                                         text.match(/posted\s+\d+\s*(?:day|days|week|weeks|month|months)\s*ago/i) ||
+                                         text.match(/posted\s+\d+\s*[dwmyh]/i);
+                            if (match) {
+                                return match[0];
+                            }
+                            // 如果元素文本较短，直接返回
+                            if (text.length < 100 && /posted\s+\d+/i.test(text)) {
+                                return text;
+                            }
+                        }
+                    }
+                    
+                    // 方法1c: 查找包含"ago"的元素（可能"Posted"和"ago"在不同元素中）
+                    const agoElements = document.querySelectorAll('*');
+                    for (let el of agoElements) {
+                        const text = el.textContent || el.innerText || '';
+                        if (/\d+\s*[dwmyh]\s*ago/i.test(text) || /\d+\s*(?:day|days|week|weeks|month|months)\s*ago/i.test(text)) {
+                            // 检查父元素是否包含"Posted"
+                            let parent = el.parentElement;
+                            let checked = 0;
+                            while (parent && parent !== document.body && checked < 5) {
+                                const parentText = parent.textContent || parent.innerText || '';
+                                if (/posted/i.test(parentText)) {
+                                    const fullText = parentText.trim();
+                                    const match = fullText.match(/posted\s+\d+\s*[dwmyh]\s*ago/i) ||
+                                                 fullText.match(/posted\s+\d+\s*(?:day|days|week|weeks|month|months)\s*ago/i);
+                                    if (match) {
+                                        return match[0];
+                                    }
+                                }
+                                parent = parent.parentElement;
+                                checked++;
+                            }
+                        }
+                    }
+                
+                return null;
+            }''')
+            
+            if posted_date_text:
+                posted_date = parse_posted_date(posted_date_text)
+                if posted_date:
+                    print(f"  ✓ 方法1-从JavaScript提取: {posted_date.strftime('%Y-%m-%d')} (原文: {posted_date_text})")
+        except Exception as e:
+            print(f"    方法1失败: {e}")
+        
+        # 方法2: 查找Seek特定的data-automation属性
+        if not posted_date:
+            posted_date_selectors = [
+                'span[data-automation="job-detail-date"]',
+                '[data-automation="jobHeaderDate"]',
+                '[data-automation*="date"]',
+                '[data-automation*="Date"]',
+                '[data-automation*="posted"]',
+                '[data-automation*="Posted"]',
+                'time[datetime]',
+                '.posted-date',
+                '.date-posted',
+                '[class*="posted"]',
+                '[class*="date"]',
+                '[class*="Posted"]',
+                '[class*="Date"]'
+            ]
+            for selector in posted_date_selectors:
+                try:
+                    date_elem = await page.query_selector(selector)
+                    if date_elem:
+                        # 尝试从datetime属性获取
+                        datetime_attr = await date_elem.get_attribute('datetime')
+                        if datetime_attr:
+                            try:
+                                posted_date = date_parser.parse(datetime_attr)
+                                print(f"  ✓ 方法2a-从datetime属性提取: {posted_date.strftime('%Y-%m-%d')}")
+                                break
+                            except:
+                                pass
+                        
+                        # 尝试从文本内容解析
+                        date_text = (await date_elem.inner_text()).strip()
+                        if date_text:
+                            posted_date = parse_posted_date(date_text)
+                            if posted_date:
+                                print(f"  ✓ 方法2b-从元素文本提取: {posted_date.strftime('%Y-%m-%d')} (原文: {date_text})")
+                                break
+                        
+                        # 尝试从title属性获取
+                        title_attr = await date_elem.get_attribute('title')
+                        if title_attr:
+                            posted_date = parse_posted_date(title_attr)
+                            if posted_date:
+                                print(f"  ✓ 方法2c-从title属性提取: {posted_date.strftime('%Y-%m-%d')} (原文: {title_attr})")
+                                break
+                except:
+                    continue
+        
+        # 方法3: 从整个页面文本中查找（作为兜底）
+        if not posted_date:
+            try:
+                page_text = await page.inner_text('body')
+                posted_date = extract_posted_date_from_text(page_text)
+                if posted_date:
+                    print(f"  ✓ 方法3-从页面文本提取: {posted_date.strftime('%Y-%m-%d')}")
+            except Exception as e:
+                print(f"    方法3失败: {e}")
+        
+        # 方法4: 尝试从页面HTML中查找（最后尝试）
+        if not posted_date:
+            try:
+                html_content = await page.content()
+                # 查找包含"Posted"的HTML片段
+                posted_patterns = [
+                    r'posted\s+(\d+\s*[dwmyh])\s*ago',
+                    r'posted\s+(\d+\s*(?:day|days|week|weeks|month|months|hour|hours))\s*ago',
+                ]
+                
+                for pattern in posted_patterns:
+                    matches = re.finditer(pattern, html_content, re.IGNORECASE)
+                    for match in matches:
+                        try:
+                            posted_text = match.group(0)
+                            posted_date = parse_posted_date(posted_text)
+                            if posted_date:
+                                print(f"  ✓ 方法4-从HTML提取: {posted_date.strftime('%Y-%m-%d')} (原文: {posted_text})")
+                                break
+                        except:
+                            continue
+                    if posted_date:
+                        break
+            except Exception as e:
+                print(f"    方法4失败: {e}")
+        
+        if posted_date:
+            job_data['posted_date'] = posted_date.isoformat()
+        else:
+            print(f"  ⚠ 未能提取发布日期，将在后续使用AI提取")
         
         # 提取职位描述
         description_selectors = [
@@ -671,6 +974,18 @@ async def save_job_to_api(job_data: Dict[str, Any], source: str) -> bool:
         if not company_guess or company_guess.lower() == 'unknown':
             company_guess = None
         
+        # 处理 posted_date
+        posted_date_str = job_data.get('posted_date')
+        posted_date = None
+        if posted_date_str:
+            try:
+                if isinstance(posted_date_str, str):
+                    posted_date = datetime.fromisoformat(posted_date_str.replace('Z', '+00:00'))
+                elif isinstance(posted_date_str, datetime):
+                    posted_date = posted_date_str
+            except:
+                pass
+        
         payload = {
             "source": source,
             "url": job_data.get('url', ''),
@@ -678,6 +993,7 @@ async def save_job_to_api(job_data: Dict[str, Any], source: str) -> bool:
             "company_guess": company_guess,
             "location_guess": job_data.get('location'),
             "extracted_text": job_data.get('jd_text', ''),
+            "posted_date": posted_date.isoformat() if posted_date else None,
         }
         
         # 调用capture端点

@@ -56,6 +56,7 @@ async def extract_with_ai(
 7. **学历要求**：提取学历要求（bachelor, master, phd等）
 8. **证书要求**：提取认证要求（AWS Certified, Azure Certified等）
 9. **职位摘要**：生成一个简洁的职位摘要（2-3句话）
+10. **发布日期**：如果职位描述中包含发布日期信息（如"Posted 25d ago"、"Posted 21/01/2026"等），提取发布日期。日期格式应为ISO格式（YYYY-MM-DD）或null
 
 请以JSON格式返回结果，格式如下：
 {
@@ -67,7 +68,8 @@ async def extract_with_ai(
     "years_required": 3,
     "degree_required": "bachelor",
     "certifications": ["AWS Certified Solutions Architect"],
-    "summary": "这是一个中级后端开发职位，需要Python和FastAPI经验..."
+    "summary": "这是一个中级后端开发职位，需要Python和FastAPI经验...",
+    "posted_date": "2026-01-21" 或 null
 }
 
 注意：
@@ -86,7 +88,7 @@ async def extract_with_ai(
 职位描述：
 {jd_text}
 
-请提取关键信息并以JSON格式返回。"""
+请提取关键信息并以JSON格式返回。特别注意：如果职位描述中包含发布日期信息（如"Posted 25d ago"、"Posted 21/01/2026"、"Date posted: 2026-01-21"等），请提取并返回posted_date字段。"""
     
     try:
         messages = [
@@ -156,8 +158,22 @@ def _normalize_ai_result(result: Dict[str, Any]) -> Dict[str, Any]:
         "years_required": result.get("years_required"),
         "degree_required": result.get("degree_required"),
         "certifications": result.get("certifications", []),
-        "summary": result.get("summary", "")
+        "summary": result.get("summary", ""),
+        "posted_date": result.get("posted_date")  # 可以是字符串或null
     }
+    
+    # 如果posted_date是字符串，尝试解析并验证
+    if normalized["posted_date"]:
+        try:
+            from datetime import datetime
+            # 尝试解析日期字符串
+            if isinstance(normalized["posted_date"], str):
+                parsed_date = datetime.fromisoformat(normalized["posted_date"].replace('Z', '+00:00'))
+                normalized["posted_date"] = parsed_date.strftime('%Y-%m-%d')
+            else:
+                normalized["posted_date"] = None
+        except:
+            normalized["posted_date"] = None
     
     # 验证 role_family
     valid_role_families = {

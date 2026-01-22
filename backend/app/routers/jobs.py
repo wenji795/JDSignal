@@ -68,6 +68,29 @@ async def create_job(job_data: JobCreate, session: Session = Depends(get_session
             use_ai=True
         )
         session.refresh(job)
+        
+        # 如果posted_date未设置，尝试从AI提取结果中获取
+        if not job.posted_date:
+            from app.extractors.ai_enhanced_extractor import extract_with_ai
+            ai_result = await extract_with_ai(
+                job.jd_text,
+                job_title=job.title,
+                company=job.company
+            )
+            if ai_result.get("success") and ai_result.get("posted_date"):
+                try:
+                    from datetime import datetime
+                    posted_date_str = ai_result.get("posted_date")
+                    if isinstance(posted_date_str, str):
+                        # 解析日期字符串
+                        posted_date = datetime.fromisoformat(posted_date_str.replace('Z', '+00:00'))
+                        job.posted_date = posted_date
+                        session.add(job)
+                        session.commit()
+                        session.refresh(job)
+                        print(f"✓ 从AI提取到posted_date: {posted_date.strftime('%Y-%m-%d')}")
+                except Exception as e:
+                    print(f"解析AI提取的posted_date失败: {e}")
     except Exception as e:
         # 即使提取失败，也返回创建的职位
         print(f"提取失败: {e}")

@@ -217,9 +217,11 @@ export default function JobsPage() {
                     {job.company && job.company.trim() && job.company.toLowerCase() !== 'unknown' ? (
                       <span>{job.company}</span>
                     ) : null}
-                    {job.posted_date ? (
-                      <span>📅 {new Date(job.posted_date).toLocaleDateString()}</span>
-                    ) : null}
+                    {job.posted_date && job.posted_date !== null && job.posted_date !== '' ? (
+                      <span>📅 Posted: {new Date(job.posted_date).toLocaleDateString('en-GB')}</span>
+                    ) : (
+                      <span>📅 Captured: {new Date(job.captured_at).toLocaleDateString('en-GB')}</span>
+                    )}
                     {job.location && <span>📍 {job.location}</span>}
                   </div>
                   <div className="flex gap-2 flex-wrap">
@@ -259,7 +261,7 @@ export default function JobsPage() {
                   </div>
                 </div>
                 <div className="text-right text-sm text-gray-500">
-                  <div>{new Date(job.captured_at).toLocaleDateString()}</div>
+                  <div>{job.posted_date && job.posted_date !== null && job.posted_date !== '' ? new Date(job.posted_date).toLocaleDateString('en-GB') : new Date(job.captured_at).toLocaleDateString('en-GB')}</div>
                   {job.extraction && (
                     <div className="mt-1 text-xs text-green-600">
                       {job.extraction.keywords_json.keywords.length} keywords

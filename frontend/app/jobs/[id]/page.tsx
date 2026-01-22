@@ -149,10 +149,17 @@ export default function JobDetailPage() {
                 {job.status}
               </span>
             </div>
-            <div>
-              <span className="font-semibold">Captured At: </span>
-              {new Date(job.captured_at).toLocaleString()}
-            </div>
+            {job.posted_date ? (
+              <div>
+                <span className="font-semibold">Posted At: </span>
+                {new Date(job.posted_date).toLocaleString('en-GB')}
+              </div>
+            ) : (
+              <div>
+                <span className="font-semibold">Captured At: </span>
+                {new Date(job.captured_at).toLocaleString('en-GB')}
+              </div>
+            )}
           </div>
         </div>
 

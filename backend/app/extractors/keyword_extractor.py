@@ -744,6 +744,15 @@ async def extract_and_save(
                             job.seniority = Seniority(seniority_value)
                         except ValueError:
                             pass
+                # 如果AI提取到了posted_date且job还没有posted_date，更新它
+                if extracted.get("posted_date") and not job.posted_date:
+                    try:
+                        posted_date_str = extracted.get("posted_date")
+                        if isinstance(posted_date_str, str):
+                            posted_date = datetime.fromisoformat(posted_date_str.replace('Z', '+00:00'))
+                            job.posted_date = posted_date
+                    except Exception as e:
+                        print(f"解析AI提取的posted_date失败: {e}")
                 session.add(job)
         
     except Exception as e:

@@ -81,6 +81,7 @@ def capture_job(capture_data: CaptureRequest, session: Session = Depends(get_ses
         "title": capture_data.page_title,
         "company": company,
         "location": capture_data.location_guess,
+        "posted_date": capture_data.posted_date,
         "jd_text": capture_data.extracted_text,
         "status": JobStatus.NEW,
         "role_family": role_family,
