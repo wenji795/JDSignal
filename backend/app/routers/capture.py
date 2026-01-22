@@ -9,7 +9,7 @@ from app.database import get_session
 from app.models import Job, Extraction, JobStatus
 from app.schemas import CaptureRequest, CaptureResponse
 from app.extractors.keyword_extractor import extract_and_save
-from app.extractors.role_inferrer import infer_role_and_seniority
+from app.extractors.ai_role_inferrer import infer_role_and_seniority_with_ai
 
 router = APIRouter(prefix="/capture", tags=["capture"])
 
@@ -59,11 +59,13 @@ def capture_job(capture_data: CaptureRequest, session: Session = Depends(get_ses
     # 准备Job数据
     captured_at = capture_data.captured_at if capture_data.captured_at else datetime.utcnow()
     
-    # 自动推断role_family和seniority
-    role_family, seniority = infer_role_and_seniority(
+    # 自动推断role_family和seniority（AI优先）
+    import asyncio
+    role_family, seniority = asyncio.run(infer_role_and_seniority_with_ai(
         capture_data.page_title,
-        capture_data.extracted_text
-    )
+        capture_data.extracted_text,
+        use_ai=True
+    ))
     
     # 使用page_title作为title，company_guess作为company
     # 如果 company_guess 为空或 "Unknown"，则不设置 company 字段（让它为 None）

@@ -218,7 +218,14 @@ def get_trends(
             continue
         keywords_data = extraction.keywords_json.get("keywords", [])
         for kw in keywords_data:
-            term = kw.get("term", "")
+            # 处理两种格式：字符串列表或字典列表
+            if isinstance(kw, dict):
+                term = kw.get("term", "")
+            elif isinstance(kw, str):
+                term = kw
+            else:
+                continue  # 跳过无效格式
+            
             # 过滤掉通用关键词
             if term and not should_filter_keyword(term):
                 # 规范化关键词
@@ -358,7 +365,14 @@ def get_trends(
                 continue
             keywords_data = extraction.keywords_json.get("keywords", [])
             for kw in keywords_data:
-                term = kw.get("term", "")
+                # 处理两种格式：字符串列表或字典列表
+                if isinstance(kw, dict):
+                    term = kw.get("term", "")
+                elif isinstance(kw, str):
+                    term = kw
+                else:
+                    continue  # 跳过无效格式
+                
                 # 过滤掉通用关键词
                 if term and not should_filter_keyword(term):
                     # 规范化关键词

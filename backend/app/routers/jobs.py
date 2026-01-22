@@ -37,6 +37,21 @@ async def create_job(job_data: JobCreate, session: Session = Depends(get_session
     # model_validator已经处理了jd_text和source的转换
     # 排除selected_text字段（它不应该保存到数据库）
     job_dict = job_data.model_dump(exclude={"selected_text"})
+    
+    # 如果用户没有提供role_family或seniority，使用AI推断（优先）
+    if not job_dict.get("role_family") or not job_dict.get("seniority"):
+        from app.extractors.ai_role_inferrer import infer_role_and_seniority_with_ai
+        inferred_role_family, inferred_seniority = await infer_role_and_seniority_with_ai(
+            job_data.title,
+            job_data.jd_text or "",
+            use_ai=True
+        )
+        # 只有在用户没有提供时才使用推断结果
+        if not job_dict.get("role_family") and inferred_role_family:
+            job_dict["role_family"] = inferred_role_family
+        if not job_dict.get("seniority") and inferred_seniority:
+            job_dict["seniority"] = inferred_seniority
+    
     job = Job(**job_dict)
     session.add(job)
     session.commit()

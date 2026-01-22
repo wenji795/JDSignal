@@ -95,6 +95,8 @@ export default function JobDetailPage() {
                   job.role_family === 'frontend' ? 'bg-cyan-600 text-white' :
                   job.role_family === 'devops' ? 'bg-emerald-600 text-white' :
                   job.role_family === 'data' ? 'bg-blue-600 text-white' :
+                  job.role_family === 'business analyst' ? 'bg-amber-600 text-white' :
+                  job.role_family === 'product manager' ? 'bg-rose-600 text-white' :
                   job.role_family === 'mobile' ? 'bg-teal-600 text-white' :
                   job.role_family === '其他' ? 'bg-gray-600 text-white' :
                   'bg-gray-600 text-white'

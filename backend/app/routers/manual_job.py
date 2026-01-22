@@ -9,7 +9,7 @@ from app.database import get_session
 from app.models import Job, Extraction, JobStatus
 from app.schemas import JobResponse, ExtractionResponse
 from app.extractors.keyword_extractor import extract_and_save_sync
-from app.extractors.role_inferrer import infer_role_and_seniority
+from app.extractors.ai_role_inferrer import infer_role_and_seniority_with_ai
 
 router = APIRouter(prefix="/manual-job", tags=["manual-job"])
 
@@ -44,11 +44,13 @@ def create_manual_job(
                 detail=f"职位URL已存在: {job_data.url}"
             )
     
-    # 自动推断role_family和seniority
-    role_family, seniority = infer_role_and_seniority(
+    # 自动推断role_family和seniority（AI优先）
+    import asyncio
+    role_family, seniority = asyncio.run(infer_role_and_seniority_with_ai(
         job_data.title,
-        job_data.jd_text
-    )
+        job_data.jd_text,
+        use_ai=True
+    ))
     
     # 创建Job记录
     job = Job(

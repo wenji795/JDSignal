@@ -21,6 +21,8 @@ export default function JobsPage() {
     'frontend', // 前端/UI/UX
     'devops', 
     'data',
+    'business analyst', // 业务分析师
+    'product manager', // 产品经理
     'mobile',
     '其他'      // 其他角色
   ]
@@ -33,6 +35,8 @@ export default function JobsPage() {
     'frontend': '前端/UI/UX',
     'devops': 'DevOps',
     'data': '数据',
+    'business analyst': '业务分析师',
+    'product manager': '产品经理',
     'mobile': '移动开发',
     '其他': '其他'
   }
@@ -59,6 +63,8 @@ export default function JobsPage() {
     'frontend': 'bg-cyan-600 text-white',
     'devops': 'bg-emerald-600 text-white',
     'data': 'bg-blue-600 text-white',
+    'business analyst': 'bg-amber-600 text-white',
+    'product manager': 'bg-rose-600 text-white',
     'mobile': 'bg-teal-600 text-white',
     '其他': 'bg-gray-600 text-white'
   }

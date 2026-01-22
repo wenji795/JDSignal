@@ -12,6 +12,8 @@ const roleFamilyColors: Record<string, string> = {
   'frontend': '#0891b2',   // cyan-600
   'devops': '#059669',      // emerald-600
   'data': '#2563eb',        // blue-600
+  'business analyst': '#d97706',  // amber-600
+  'product manager': '#e11d48',  // rose-600
   'mobile': '#0d9488',      // teal-600
   '其他': '#6b7280'         // gray-500
 }
@@ -55,6 +57,8 @@ export default function TrendsPage() {
     { value: 'frontend', label: '前端/UI/UX' },
     { value: 'devops', label: 'DevOps' },
     { value: 'data', label: '数据' },
+    { value: 'business analyst', label: '业务分析师' },
+    { value: 'product manager', label: '产品经理' },
     { value: 'mobile', label: '移动开发' },
     { value: '其他', label: '其他' }
   ]
@@ -67,6 +71,8 @@ export default function TrendsPage() {
     'frontend': '前端/UI/UX',
     'devops': 'DevOps',
     'data': '数据',
+    'business analyst': '业务分析师',
+    'product manager': '产品经理',
     'mobile': '移动开发',
     '其他': '其他'
   }

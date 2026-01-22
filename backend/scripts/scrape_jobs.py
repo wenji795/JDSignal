@@ -455,7 +455,8 @@ def is_non_it_job(title: str, jd_text: str = "") -> bool:
     it_keywords = [
         'software', 'developer', 'programmer', 'engineer', 'architect',
         'devops', 'sre', 'data engineer', 'data scientist', 'data analyst',
-        'qa engineer', 'test engineer', 'quality engineer', 'automation engineer',
+        'qa engineer', 'test engineer', 'quality assurance engineer', 'quality engineer', 
+        'automation engineer', 'test automation engineer', 'qa automation',
         'cloud engineer', 'security engineer', 'network engineer',
         'product manager', 'scrum master', 'agile', 'it ', 'information technology',
         'full stack', 'frontend', 'backend', 'mobile developer', 'ios developer',
@@ -467,8 +468,59 @@ def is_non_it_job(title: str, jd_text: str = "") -> bool:
         'technical writer', 'technical documentation', 'technical content',  # 技术写作是IT相关
         'product marketing', 'ai solutions', 'test analyst', 'content specialist',  # IT相关岗位
         'marketing designer', 'instructional designer',  # IT相关的设计和内容岗位
-        'data administrator', 'quality administrator', 'data and quality'  # 数据管理相关是IT岗位
+        'data administrator', 'quality administrator', 'data and quality',  # 数据管理相关是IT岗位
+        'software quality', 'quality assurance', 'qa specialist', 'qa tester',  # IT Quality相关
+        'test specialist', 'quality specialist', 'qa lead', 'test lead'  # IT Quality相关
     ]
+    
+    # 特殊处理：Quality相关职位需要检查是否是IT Quality
+    # Quality Specialist, Quality Control等可能是制造/生产相关，需要检查上下文
+    quality_keywords = ['quality specialist', 'quality control', 'quality assurance', 'quality manager', 
+                        'quality coordinator', 'quality analyst', 'quality technician']
+    
+    if any(keyword in title_lower for keyword in quality_keywords):
+        # 检查是否是IT Quality（软件测试、QA等）
+        it_quality_indicators = [
+            'software', 'qa', 'test', 'testing', 'automation', 'selenium', 'cypress',
+            'test automation', 'qa engineer', 'test engineer', 'qa specialist',
+            'quality assurance engineer', 'software testing', 'manual testing',
+            'api testing', 'performance testing', 'security testing', 'it ',
+            'information technology', 'application', 'system', 'web', 'mobile',
+            'agile', 'scrum', 'devops', 'ci/cd', 'continuous integration',
+            'bug', 'defect', 'test case', 'test plan', 'test script',
+            'jira', 'testrail', 'quality center', 'test management'
+        ]
+        
+        # 检查JD中是否有IT Quality相关关键词
+        has_it_quality_context = any(indicator in text for indicator in it_quality_indicators)
+        
+        # 检查是否是制造/生产相关的Quality
+        manufacturing_quality_indicators = [
+            'manufacturing', 'production', 'factory', 'plant', 'assembly',
+            'food safety', 'haccp', 'iso 9001', 'iso 22000', 'gmp',
+            'product quality', 'material quality', 'process quality',
+            'inspection', 'sampling', 'batch', 'lot', 'packaging',
+            'supply chain', 'warehouse', 'logistics', 'distribution'
+        ]
+        
+        has_manufacturing_context = any(indicator in text for indicator in manufacturing_quality_indicators)
+        
+        # 如果明确是制造/生产相关的Quality，且没有IT上下文，则过滤掉
+        if has_manufacturing_context and not has_it_quality_context:
+            return True
+        
+        # 如果没有IT Quality上下文，根据用户要求：和quality有关的都要查看是不是IT行业，不是就不要抓到职位列表
+        if not has_it_quality_context:
+            # 检查标题中是否有明确的IT Quality关键词
+            title_has_it_keyword = any(kw in title_lower for kw in [
+                'qa engineer', 'test engineer', 'quality assurance engineer',
+                'qa specialist', 'test specialist', 'software quality',
+                'qa automation', 'test automation', 'qa lead', 'test lead'
+            ])
+            
+            # 如果标题没有明确的IT关键词，则过滤掉（严格模式）
+            if not title_has_it_keyword:
+                return True
     
     # 特殊处理：先检查明确的非IT岗位（优先级最高）
     # Site Engineer是建筑/施工相关，不是IT
@@ -506,10 +558,16 @@ def is_non_it_job(title: str, jd_text: str = "") -> bool:
     # 非IT岗位的明确关键词组合（需要精确匹配）
     # 注意：先检查IT关键词，再检查非IT关键词
     non_it_patterns = [
-        # 质量控制技术员（制造相关）
-        r'quality\s+control\s+technician',
-        r'qc\s+technician',
-        r'quality\s+inspector',
+        # 质量控制技术员（制造相关，明确非IT）
+        r'quality\s+control\s+technician(?!.*(?:software|it|test|qa))',
+        r'qc\s+technician(?!.*(?:software|it|test|qa))',
+        r'quality\s+inspector(?!.*(?:software|it|test|qa))',
+        # 制造/生产相关的Quality职位（排除IT Quality）
+        r'manufacturing\s+quality',
+        r'production\s+quality',
+        r'food\s+quality',
+        r'product\s+quality\s+(?!assurance)',  # Product Quality但不是Quality Assurance
+        r'quality\s+specialist(?!.*(?:software|it|test|qa|automation|selenium))',  # Quality Specialist但不是IT Quality
         # 电气工程（非IT）- 使用简单匹配，因为已经排除了IT关键词
         r'electrical\s+engineer(?!.*(?:software|it|information\s+technology))',
         r'electrical\s+technician',

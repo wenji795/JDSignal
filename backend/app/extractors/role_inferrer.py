@@ -86,6 +86,24 @@ def infer_role_family(title: str, jd_text: str = "") -> Optional[str]:
         'flutter developer', 'mobile engineer'
     ]
     
+    # Business Analyst相关关键词
+    business_analyst_keywords = [
+        'business analyst', 'ba', 'business systems analyst',
+        'it business analyst', 'technical business analyst',
+        'senior business analyst', 'junior business analyst',
+        'business intelligence analyst', 'bi analyst'
+    ]
+    
+    # Product Manager相关关键词
+    # 注意：移除了 'po'，因为它太宽泛，会误匹配其他词（如 "support"）
+    product_manager_keywords = [
+        'product manager', 'product owner',
+        'senior product manager', 'associate product manager',
+        'technical product manager', 'it product manager',
+        'software product manager', 'digital product manager',
+        'product lead', 'product specialist'
+    ]
+    
     # 通用开发岗位关键词（如果标题中有这些，优先判断为开发岗位）
     general_dev_keywords = [
         'software engineer', 'software developer', 'developer', 'programmer',
@@ -93,6 +111,11 @@ def infer_role_family(title: str, jd_text: str = "") -> Optional[str]:
     ]
     
     # 第一步：检查标题中的明确职位类型关键词（优先级最高）
+    # 优先检查数据相关关键词（包括"data"关键词）
+    # 检查标题中是否包含"data"关键词（使用单词边界，避免匹配"database"等词的一部分）
+    if re.search(r'\bdata\b', title_lower):
+        return 'data'
+    
     # 测试岗位（必须在标题中明确，避免误判JD中的技能要求）
     if any(keyword in title_lower for keyword in testing_title_keywords):
         return 'testing'
@@ -117,9 +140,31 @@ def infer_role_family(title: str, jd_text: str = "") -> Optional[str]:
     if any(keyword in title_lower for keyword in devops_title_keywords):
         return 'devops'
     
-    # 数据岗位
+    # 数据岗位（明确的data相关职位）
     if any(keyword in title_lower for keyword in data_title_keywords):
         return 'data'
+    
+    # Business Analyst岗位
+    if any(keyword in title_lower for keyword in business_analyst_keywords):
+        return 'business analyst'
+    
+    # Product Manager岗位（使用单词边界确保精确匹配）
+    # 检查完整的 "product manager"、"product owner" 等短语
+    pm_patterns = [
+        r'\bproduct\s+manager\b',
+        r'\bproduct\s+owner\b',
+        r'\bsenior\s+product\s+manager\b',
+        r'\bassociate\s+product\s+manager\b',
+        r'\btechnical\s+product\s+manager\b',
+        r'\bit\s+product\s+manager\b',
+        r'\bsoftware\s+product\s+manager\b',
+        r'\bdigital\s+product\s+manager\b',
+        r'\bproduct\s+lead\b',
+        r'\bproduct\s+specialist\b'
+    ]
+    for pattern in pm_patterns:
+        if re.search(pattern, title_lower, re.IGNORECASE):
+            return 'product manager'
     
     # 移动开发岗位
     if any(keyword in title_lower for keyword in mobile_title_keywords):
@@ -127,6 +172,25 @@ def infer_role_family(title: str, jd_text: str = "") -> Optional[str]:
     
     # 第二步：如果标题中有通用开发关键词，根据JD中的技术栈推断
     if any(keyword in title_lower for keyword in general_dev_keywords):
+        # 优先检查JD中是否包含"data"关键词（使用单词边界）
+        if re.search(r'\bdata\b', jd_lower):
+            return 'data'
+        
+        # 检查是否是Business Analyst（需要更严格的匹配，避免误判）
+        # 只在JD中明确提到Business Analyst相关职位时才归类
+        # 使用单词边界确保匹配完整的词
+        ba_patterns = [
+            r'\bbusiness\s+analyst\b',
+            r'\bba\s+position\b',
+            r'\bba\s+role\b',
+            r'\bbusiness\s+systems\s+analyst\b',
+            r'\bit\s+business\s+analyst\b',
+            r'\btechnical\s+business\s+analyst\b'
+        ]
+        for pattern in ba_patterns:
+            if re.search(pattern, jd_lower, re.IGNORECASE):
+                return 'business analyst'
+        
         # 检查JD中的技术栈关键词（但排除测试相关的技能要求）
         # 后端技术栈
         backend_tech_keywords = ['backend', 'server-side', 'api', 'microservices', 'rest api', 'graphql',
@@ -160,7 +224,12 @@ def infer_role_family(title: str, jd_text: str = "") -> Optional[str]:
     # 只在标题完全没有线索时才使用JD文本
     if not any(keyword in title_lower for keyword in general_dev_keywords + testing_title_keywords + 
                ai_title_keywords + backend_title_keywords + frontend_title_keywords + 
-               fullstack_title_keywords + devops_title_keywords + data_title_keywords + mobile_title_keywords):
+               fullstack_title_keywords + devops_title_keywords + data_title_keywords + 
+               business_analyst_keywords + product_manager_keywords + mobile_title_keywords):
+        
+        # 优先检查JD中是否包含"data"关键词（使用单词边界）
+        if re.search(r'\bdata\b', jd_lower):
+            return 'data'
         
         # 检查JD中的关键词（但要求更严格）
         if any(keyword in jd_lower for keyword in testing_title_keywords):
@@ -177,6 +246,20 @@ def infer_role_family(title: str, jd_text: str = "") -> Optional[str]:
             return 'devops'
         if any(keyword in jd_lower for keyword in data_title_keywords):
             return 'data'
+        # Business Analyst检查（使用更严格的模式匹配）
+        ba_patterns = [
+            r'\bbusiness\s+analyst\b',
+            r'\bba\s+position\b',
+            r'\bba\s+role\b',
+            r'\bbusiness\s+systems\s+analyst\b',
+            r'\bit\s+business\s+analyst\b',
+            r'\btechnical\s+business\s+analyst\b'
+        ]
+        for pattern in ba_patterns:
+            if re.search(pattern, jd_lower, re.IGNORECASE):
+                return 'business analyst'
+        # 注意：Product Manager 只在标题中检查，不在 JD 文本中检查
+        # 因为 JD 文本中可能包含 "product" 但不是 product manager 职位
         if any(keyword in jd_lower for keyword in mobile_title_keywords):
             return 'mobile'
     
