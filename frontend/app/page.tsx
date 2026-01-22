@@ -12,18 +12,18 @@ export default function Home() {
   const [jobCountAfter, setJobCountAfter] = useState<number | null>(null)
   const [checkInterval, setCheckInterval] = useState<NodeJS.Timeout | null>(null)
 
-  // 获取当前职位数量
+  // Get current job count
   const fetchJobCount = async () => {
     try {
       const jobs = await getJobs()
       return jobs.length
     } catch (error) {
-      console.error('获取职位数量失败:', error)
+      console.error('Failed to fetch job count:', error)
       return null
     }
   }
 
-  // 清理定时器
+  // Clean up interval
   useEffect(() => {
     return () => {
       if (checkInterval) {
@@ -39,11 +39,11 @@ export default function Home() {
     setJobCountAfter(null)
 
     try {
-      // 记录抓取前的职位数量
+      // Record job count before scraping
       const countBefore = await fetchJobCount()
       setJobCountBefore(countBefore)
 
-      // 触发抓取任务
+      // Trigger scraping task
       const result = await triggerScrape({
         max_per_keyword: 20,
         headless: true,
@@ -51,11 +51,11 @@ export default function Home() {
       })
 
       setScrapeStatus('running')
-      setScrapeMessage('✓ 抓取任务已启动，正在后台运行...')
+      setScrapeMessage('✓ Scraping task started, running in background...')
 
-      // 开始定期检查职位数量变化
+      // Start periodic checks for job count changes
       let checkCount = 0
-      const maxChecks = 30 // 最多检查30次（5分钟）
+      const maxChecks = 30 // Maximum 30 checks (5 minutes)
       const interval = setInterval(async () => {
         checkCount++
         const currentCount = await fetchJobCount()
@@ -64,13 +64,13 @@ export default function Home() {
           const newJobs = currentCount - countBefore
           if (newJobs > 0) {
             setJobCountAfter(currentCount)
-            setScrapeMessage(`✓ 抓取进行中... 已发现 ${newJobs} 个新职位`)
+            setScrapeMessage(`✓ Scraping in progress... Found ${newJobs} new jobs`)
           } else {
-            setScrapeMessage(`✓ 抓取进行中... 正在处理关键词（${checkCount * 10}秒）`)
+            setScrapeMessage(`✓ Scraping in progress... Processing keywords (${checkCount * 10}s)`)
           }
         }
 
-        // 5分钟后停止检查，假设任务已完成
+        // Stop checking after 5 minutes, assume task completed
         if (checkCount >= maxChecks) {
           clearInterval(interval)
           setCheckInterval(null)
@@ -79,24 +79,24 @@ export default function Home() {
           if (finalCount !== null && countBefore !== null) {
             const totalNewJobs = finalCount - countBefore
             if (totalNewJobs > 0) {
-              setScrapeMessage(`✓ 抓取任务已完成！共抓取 ${totalNewJobs} 个新职位`)
+              setScrapeMessage(`✓ Scraping task completed! Scraped ${totalNewJobs} new jobs`)
             } else {
-              setScrapeMessage('✓ 抓取任务已完成（未发现新职位，可能都是重复的）')
+              setScrapeMessage('✓ Scraping task completed (no new jobs found, may all be duplicates)')
             }
           } else {
-            setScrapeMessage('✓ 抓取任务已完成，请查看职位列表确认结果')
+            setScrapeMessage('✓ Scraping task completed, please check job list to confirm results')
           }
           setScraping(false)
         }
-      }, 10000) // 每10秒检查一次
+      }, 10000) // Check every 10 seconds
 
       setCheckInterval(interval)
 
     } catch (error) {
       setScrapeStatus('error')
-      setScrapeMessage(`✗ 错误: ${error instanceof Error ? error.message : '未知错误'}`)
+      setScrapeMessage(`✗ Error: ${error instanceof Error ? error.message : 'Unknown error'}`)
       setScraping(false)
-      // 清理定时器（如果已设置）
+      // Clean up interval (if set)
       if (checkInterval) {
         clearInterval(checkInterval)
         setCheckInterval(null)
@@ -108,10 +108,10 @@ export default function Home() {
     <div className="max-w-4xl mx-auto mt-12">
       <h1 className="text-4xl font-bold mb-6">Job JD Tracker & ATS Keyword Extractor</h1>
       <p className="text-xl text-gray-600 mb-8">
-        本地优先的职位JD追踪和ATS关键词提取系统
+        Local-first job JD tracking and ATS keyword extraction system
       </p>
       
-      {/* 手动触发抓取按钮 */}
+      {/* Manual scrape trigger button */}
       <div className={`border rounded-lg p-6 mb-8 transition-colors ${
         scrapeStatus === 'running' 
           ? 'bg-blue-50 border-blue-300' 
@@ -124,19 +124,19 @@ export default function Home() {
         <div className="flex flex-col gap-4">
           <div className="flex items-center justify-between">
             <div className="flex-1">
-              <h3 className="font-semibold text-blue-900 mb-1">立即抓取最新职位</h3>
+              <h3 className="font-semibold text-blue-900 mb-1">Scrape Latest Jobs Now</h3>
               <p className="text-sm text-blue-700 mb-2">
-                手动触发一次增量抓取任务，抓取新西兰Seek上的最新职位（自动去重）
+                Manually trigger an incremental scraping task to fetch the latest jobs from Seek NZ (automatic deduplication)
               </p>
               
-              {/* 状态信息 */}
+              {/* Status information */}
               {scrapeStatus !== 'idle' && (
                 <div className="mt-3 space-y-2">
                   {scrapeStatus === 'running' && (
                     <div className="flex items-center gap-2">
                       <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-blue-600"></div>
                       <p className="text-sm font-medium text-blue-800">
-                        任务正在后台运行中...
+                        Task running in background...
                       </p>
                     </div>
                   )}
@@ -151,25 +151,25 @@ export default function Home() {
                     </p>
                   )}
 
-                  {/* 职位数量变化 */}
+                  {/* Job count changes */}
                   {jobCountBefore !== null && (
                     <div className="text-xs text-gray-600 mt-2">
-                      <span>抓取前: {jobCountBefore} 个职位</span>
+                      <span>Before scraping: {jobCountBefore} jobs</span>
                       {jobCountAfter !== null && (
-                        <span className="ml-4">当前: {jobCountAfter} 个职位</span>
+                        <span className="ml-4">Current: {jobCountAfter} jobs</span>
                       )}
                     </div>
                   )}
 
-                  {/* 提示信息 */}
+                  {/* Tips */}
                   {scrapeStatus === 'running' && (
                     <div className="mt-3 p-3 bg-blue-100 rounded text-xs text-blue-800">
-                      <p className="font-medium mb-1">💡 提示：</p>
+                      <p className="font-medium mb-1">💡 Tips:</p>
                       <ul className="list-disc list-inside space-y-1">
-                        <li>抓取任务在后台运行，可能需要几分钟时间</li>
-                        <li>系统会自动检查新职位并更新显示</li>
-                        <li>您可以继续使用其他功能，无需等待</li>
-                        <li>完成后可以前往"职位列表"查看新抓取的职位</li>
+                        <li>Scraping task runs in background and may take several minutes</li>
+                        <li>System will automatically check for new jobs and update display</li>
+                        <li>You can continue using other features without waiting</li>
+                        <li>After completion, go to "Job List" to view newly scraped jobs</li>
                       </ul>
                     </div>
                   )}
@@ -190,20 +190,20 @@ export default function Home() {
                 {scraping ? (
                   <span className="flex items-center gap-2">
                     <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
-                    运行中
+                    Running
                   </span>
                 ) : (
-                  '开始抓取'
+                  'Start Scraping'
                 )}
               </button>
               
-              {/* 完成后显示查看职位列表按钮 */}
+              {/* Show view job list button after completion */}
               {scrapeStatus === 'completed' && (
                 <Link
                   href="/jobs"
                   className="px-4 py-2 bg-green-600 text-white rounded hover:bg-green-700 text-sm transition-colors"
                 >
-                  查看职位列表 →
+                  View Job List →
                 </Link>
               )}
             </div>
@@ -213,18 +213,18 @@ export default function Home() {
       
       <div className="grid md:grid-cols-3 gap-6 mt-8">
         <Link href="/jobs" className="p-6 border rounded-lg hover:shadow-lg transition-shadow">
-          <h2 className="text-2xl font-semibold mb-2">职位列表</h2>
-          <p className="text-gray-600">查看所有职位，筛选和管理职位信息</p>
+          <h2 className="text-2xl font-semibold mb-2">Job List</h2>
+          <p className="text-gray-600">View all jobs, filter and manage job information</p>
         </Link>
         
         <Link href="/trends" className="p-6 border rounded-lg hover:shadow-lg transition-shadow">
-          <h2 className="text-2xl font-semibold mb-2">趋势分析</h2>
-          <p className="text-gray-600">查看关键词趋势和统计分析</p>
+          <h2 className="text-2xl font-semibold mb-2">Trend Analysis</h2>
+          <p className="text-gray-600">View keyword trends and statistical analysis</p>
         </Link>
         
         <Link href="/manual-job" className="p-6 border rounded-lg hover:shadow-lg transition-shadow">
-          <h2 className="text-2xl font-semibold mb-2">手动输入JD</h2>
-          <p className="text-gray-600">通过纯文本形式手动输入职位JD</p>
+          <h2 className="text-2xl font-semibold mb-2">Manual JD Input</h2>
+          <p className="text-gray-600">Manually input job JD via plain text</p>
         </Link>
       </div>
     </div>

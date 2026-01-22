@@ -4,7 +4,7 @@ import { useEffect, useState } from 'react'
 import { getTrends, type TrendsResponse } from '@/lib/api'
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell } from 'recharts'
 
-// 角色族颜色映射（与jobs页面保持一致）
+// Role family colour mapping (consistent with jobs page)
 const roleFamilyColors: Record<string, string> = {
   'testing': '#db2777',    // pink-600
   'ai': '#9333ea',         // purple-600
@@ -18,27 +18,27 @@ const roleFamilyColors: Record<string, string> = {
   '其他': '#6b7280'         // gray-500
 }
 
-// 资历级别颜色映射（与jobs页面保持一致）
+// Seniority level colour mapping (consistent with jobs page)
 const seniorityColors: Record<string, string> = {
-  'graduate': '#84cc16',    // lime-500 (使用稍深一点的颜色以便在饼图上可见)
+  'graduate': '#84cc16',    // lime-500 (using slightly darker colour for visibility on pie chart)
   'junior': '#eab308',      // yellow-500
   'intermediate': '#f59e0b', // amber-500
-  'mid': '#f59e0b',         // amber-500 (intermediate的映射)
+  'mid': '#f59e0b',         // amber-500 (mapping for intermediate)
   'senior': '#f97316'       // orange-500
 }
 
-// 获取角色族颜色
+// Get role family colour
 const getRoleFamilyColor = (roleFamily: string): string => {
-  return roleFamilyColors[roleFamily.toLowerCase()] || '#6b7280' // gray-500作为默认
+  return roleFamilyColors[roleFamily.toLowerCase()] || '#6b7280' // gray-500 as default
 }
 
-// 获取资历级别颜色
+// Get seniority level colour
 const getSeniorityColor = (seniority: string): string => {
   const key = seniority.toLowerCase()
-  // 处理显示名称到实际值的映射
+  // Handle display name to actual value mapping
   if (key === 'graduate') return seniorityColors['graduate']
   if (key === 'intermediate') return seniorityColors['intermediate']
-  return seniorityColors[key] || '#6b7280' // gray-500作为默认
+  return seniorityColors[key] || '#6b7280' // gray-500 as default
 }
 
 export default function TrendsPage() {
@@ -46,35 +46,35 @@ export default function TrendsPage() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [days, setDays] = useState(30)
-  const [roleFamily, setRoleFamily] = useState('') // 角色族筛选
+  const [roleFamily, setRoleFamily] = useState('') // Role family filter
 
-  // 角色族选项
+  // Role family options
   const roleFamilyOptions = [
-    { value: '', label: '全部' },
-    { value: 'testing', label: '软件测试' },
-    { value: 'ai', label: 'AI/机器学习' },
-    { value: 'fullstack', label: '全栈' },
-    { value: 'frontend', label: '前端/UI/UX' },
+    { value: '', label: 'All' },
+    { value: 'testing', label: 'Software Testing' },
+    { value: 'ai', label: 'AI/Machine Learning' },
+    { value: 'fullstack', label: 'Full Stack' },
+    { value: 'frontend', label: 'Frontend/UI/UX' },
     { value: 'devops', label: 'DevOps' },
-    { value: 'data', label: '数据' },
-    { value: 'business analyst', label: '业务分析师' },
-    { value: 'product manager', label: '产品经理' },
-    { value: 'mobile', label: '移动开发' },
-    { value: '其他', label: '其他' }
+    { value: 'data', label: 'Data' },
+    { value: 'business analyst', label: 'Business Analyst' },
+    { value: 'product manager', label: 'Product Manager' },
+    { value: 'mobile', label: 'Mobile Development' },
+    { value: '其他', label: 'Other' }
   ]
   
-  // 角色族中文显示名称映射
+  // Role family display labels
   const roleFamilyLabels: Record<string, string> = {
-    'testing': '软件测试',
-    'ai': 'AI/机器学习',
-    'fullstack': '全栈',
-    'frontend': '前端/UI/UX',
+    'testing': 'Software Testing',
+    'ai': 'AI/Machine Learning',
+    'fullstack': 'Full Stack',
+    'frontend': 'Frontend/UI/UX',
     'devops': 'DevOps',
-    'data': '数据',
-    'business analyst': '业务分析师',
-    'product manager': '产品经理',
-    'mobile': '移动开发',
-    '其他': '其他'
+    'data': 'Data',
+    'business analyst': 'Business Analyst',
+    'product manager': 'Product Manager',
+    'mobile': 'Mobile Development',
+    '其他': 'Other'
   }
 
   useEffect(() => {
@@ -84,7 +84,7 @@ export default function TrendsPage() {
   const loadTrends = async () => {
     try {
       setLoading(true)
-      // 确保空字符串不被发送
+      // Ensure empty strings are not sent
       const params: {
         days: number;
         role_family?: string;
@@ -107,8 +107,8 @@ export default function TrendsPage() {
   if (loading) {
     return (
       <div className="text-center py-12">
-        <div className="text-lg mb-2">加载中...</div>
-        <div className="text-sm text-gray-500">正在连接后端API (http://127.0.0.1:8000)</div>
+        <div className="text-lg mb-2">Loading...</div>
+        <div className="text-sm text-gray-500">Connecting to backend API (http://127.0.0.1:8000)</div>
       </div>
     )
   }
@@ -116,20 +116,20 @@ export default function TrendsPage() {
   if (error || !trends) {
     return (
       <div className="text-red-500 py-12">
-        <div className="text-xl font-semibold mb-2">错误: {error || 'Failed to load trends'}</div>
+        <div className="text-xl font-semibold mb-2">Error: {error || 'Failed to load trends'}</div>
         <div className="text-sm text-gray-600 mt-4">
-          <p>请检查：</p>
+          <p>Please check:</p>
           <ul className="list-disc list-inside mt-2">
-            <li>后端服务是否运行在 http://127.0.0.1:8000</li>
-            <li>运行命令: <code className="bg-gray-100 px-2 py-1 rounded">cd backend && uvicorn app.main:app --reload</code></li>
-            <li>浏览器控制台是否有更多错误信息</li>
+            <li>Is the backend service running at http://127.0.0.1:8000</li>
+            <li>Run command: <code className="bg-gray-100 px-2 py-1 rounded">cd backend && uvicorn app.main:app --reload</code></li>
+            <li>Check browser console for more error information</li>
           </ul>
         </div>
       </div>
     )
   }
 
-  // 准备图表数据
+  // Prepare chart data
   const roleFamilyData = Object.entries(trends.count_by_role_family).map(([name, value]) => ({
     name,
     value
@@ -140,7 +140,7 @@ export default function TrendsPage() {
     value
   }))
 
-  // 根据是否选择了角色族，显示不同的top20关键词
+  // Show different top 20 keywords based on selected role family
   const keywordsToShow = roleFamily && trends.selected_role_family_top_keywords 
     ? trends.selected_role_family_top_keywords 
     : trends.top_keywords
@@ -151,13 +151,13 @@ export default function TrendsPage() {
     count: kw.count
   }))
   
-  // 图表标题
+  // Chart titles
   const roleFamilyLabel = roleFamilyOptions.find(opt => opt.value === roleFamily)?.label || roleFamily
   const keywordsChartTitle = roleFamily && trends.selected_role_family_top_keywords
-    ? `${roleFamilyLabel} - Top 20 关键词`
-    : 'Top 20 关键词（全部）'
+    ? `${roleFamilyLabel} - Top 20 Keywords`
+    : 'Top 20 Keywords (All)'
 
-  // 关键词增长数据（取top 10增长）- 已废弃，使用monthly_comparison代替
+  // Keyword growth data (top 10 growth) - deprecated, using monthly_comparison instead
   const growthData: Array<{
     name: string
     fullName: string
@@ -168,10 +168,10 @@ export default function TrendsPage() {
   return (
     <div>
       <div className="flex justify-between items-center mb-6">
-        <h1 className="text-3xl font-bold">趋势分析</h1>
+        <h1 className="text-3xl font-bold">Trend Analysis</h1>
         <div className="flex items-center gap-4">
           <div className="flex items-center gap-2">
-            <label>角色族：</label>
+            <label>Role Family: </label>
             <select
               value={roleFamily}
               onChange={(e) => setRoleFamily(e.target.value)}
@@ -183,32 +183,32 @@ export default function TrendsPage() {
             </select>
           </div>
           <div className="flex items-center gap-2">
-            <label>时间窗口：</label>
+            <label>Time Window: </label>
             <select
               value={days}
               onChange={(e) => setDays(Number(e.target.value))}
               className="p-2 border rounded"
             >
-              <option value={7}>7天</option>
-              <option value={30}>30天</option>
-              <option value={60}>60天</option>
-              <option value={90}>90天</option>
+              <option value={7}>7 days</option>
+              <option value={30}>30 days</option>
+              <option value={60}>60 days</option>
+              <option value={90}>90 days</option>
             </select>
           </div>
         </div>
       </div>
 
-      {/* 总职位数 */}
+      {/* Total Jobs */}
       <div className="bg-blue-50 border border-blue-200 rounded-lg p-6 mb-6">
         <div className="text-2xl font-bold text-blue-800">{trends.total_jobs}</div>
-        <div className="text-blue-600">总职位数</div>
+        <div className="text-blue-600">Total Jobs</div>
       </div>
 
       <div className="grid md:grid-cols-2 gap-6 mb-6">
-        {/* 角色族分布 */}
+        {/* Role Family Distribution */}
         {roleFamilyData.length > 0 && (
           <div className="bg-white rounded-lg shadow p-6">
-            <h2 className="text-xl font-semibold mb-4">角色族分布</h2>
+            <h2 className="text-xl font-semibold mb-4">Role Family Distribution</h2>
             <ResponsiveContainer width="100%" height={300}>
               <PieChart>
                 <Pie
@@ -234,10 +234,10 @@ export default function TrendsPage() {
           </div>
         )}
 
-        {/* 资历级别分布 */}
+        {/* Seniority Level Distribution */}
         {seniorityData.length > 0 && (
           <div className="bg-white rounded-lg shadow p-6">
-            <h2 className="text-xl font-semibold mb-4">资历级别分布</h2>
+            <h2 className="text-xl font-semibold mb-4">Seniority Level Distribution</h2>
             <ResponsiveContainer width="100%" height={300}>
               <PieChart>
                 <Pie
@@ -246,7 +246,7 @@ export default function TrendsPage() {
                   cy="50%"
                   labelLine={false}
                   label={({ name, percent }) => {
-                    // 显示友好的名称
+                    // Display friendly names
                     const displayName = name === 'junior' ? 'Junior' :
                                        name === 'mid' ? 'Intermediate' :
                                        name === 'senior' ? 'Senior' :
@@ -268,7 +268,7 @@ export default function TrendsPage() {
         )}
       </div>
 
-      {/* Top关键词 */}
+      {/* Top Keywords */}
       {topKeywordsData.length > 0 && (
         <div className="bg-white rounded-lg shadow p-6 mb-6">
           <h2 className="text-xl font-semibold mb-4">{keywordsChartTitle}</h2>
@@ -288,7 +288,7 @@ export default function TrendsPage() {
                     return (
                       <div className="bg-white p-2 border rounded shadow">
                         <p className="font-semibold">{payload[0].payload.fullName}</p>
-                        <p>出现次数: {payload[0].value}</p>
+                        <p>Occurrences: {payload[0].value}</p>
                       </div>
                     )
                   }
@@ -301,10 +301,10 @@ export default function TrendsPage() {
         </div>
       )}
 
-      {/* 关键词增长 */}
+      {/* Keyword Growth */}
       {growthData.length > 0 && (
         <div className="bg-white rounded-lg shadow p-6 mb-6">
-          <h2 className="text-xl font-semibold mb-4">关键词增长趋势（Top 10）</h2>
+          <h2 className="text-xl font-semibold mb-4">Keyword Growth Trends (Top 10)</h2>
           <ResponsiveContainer width="100%" height={400}>
             <BarChart data={growthData}>
               <CartesianGrid strokeDasharray="3 3" />
@@ -322,8 +322,8 @@ export default function TrendsPage() {
                     return (
                       <div className="bg-white p-2 border rounded shadow">
                         <p className="font-semibold">{data.fullName}</p>
-                        <p>增长率: {data.percent_change.toFixed(2)}%</p>
-                        <p>变化量: {data.delta > 0 ? '+' : ''}{data.delta}</p>
+                        <p>Growth Rate: {data.percent_change.toFixed(2)}%</p>
+                        <p>Change: {data.delta > 0 ? '+' : ''}{data.delta}</p>
                       </div>
                     )
                   }
@@ -339,30 +339,30 @@ export default function TrendsPage() {
         </div>
       )}
 
-      {/* 上月vs本月关键词比较 - 总体Top 7 */}
+      {/* Last Month vs This Month Keyword Comparison - Overall Top 7 */}
       {trends.monthly_comparison && trends.monthly_comparison.comparison.length > 0 && (
         <div className="bg-white rounded-lg shadow p-6 mb-6">
-          <h2 className="text-xl font-semibold mb-4">上月 vs 本月关键词对比（总体 Top 7）</h2>
+          <h2 className="text-xl font-semibold mb-4">Last Month vs This Month Keyword Comparison (Overall Top 7)</h2>
           <div className="mb-4 text-sm text-gray-600">
             <p>
-              本月 ({new Date(trends.monthly_comparison.current_month.start).toLocaleDateString('zh-CN', { year: 'numeric', month: 'long' })}): 
-              <span className="font-semibold ml-1">{trends.monthly_comparison.current_month.job_count}</span> 个职位
+              This Month ({new Date(trends.monthly_comparison.current_month.start).toLocaleDateString('en-GB', { year: 'numeric', month: 'long' })}): 
+              <span className="font-semibold ml-1">{trends.monthly_comparison.current_month.job_count}</span> jobs
             </p>
             <p>
-              上月 ({new Date(trends.monthly_comparison.last_month.start).toLocaleDateString('zh-CN', { year: 'numeric', month: 'long' })}): 
-              <span className="font-semibold ml-1">{trends.monthly_comparison.last_month.job_count}</span> 个职位
+              Last Month ({new Date(trends.monthly_comparison.last_month.start).toLocaleDateString('en-GB', { year: 'numeric', month: 'long' })}): 
+              <span className="font-semibold ml-1">{trends.monthly_comparison.last_month.job_count}</span> jobs
             </p>
           </div>
           <div className="overflow-x-auto">
             <table className="min-w-full divide-y divide-gray-200">
               <thead className="bg-gray-50">
                 <tr>
-                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">关键词</th>
-                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">上月</th>
-                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">本月</th>
-                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">变化</th>
-                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">变化率</th>
-                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">状态</th>
+                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Keyword</th>
+                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Last Month</th>
+                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">This Month</th>
+                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Change</th>
+                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Change Rate</th>
+                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
                 </tr>
               </thead>
               <tbody className="bg-white divide-y divide-gray-200">
@@ -374,10 +374,10 @@ export default function TrendsPage() {
                     'unchanged': 'bg-gray-100 text-gray-800'
                   }
                   const statusLabels = {
-                    'new': '新增',
-                    'increased': '增长',
-                    'decreased': '下降',
-                    'unchanged': '不变'
+                    'new': 'New',
+                    'increased': 'Increased',
+                    'decreased': 'Decreased',
+                    'unchanged': 'Unchanged'
                   }
                   return (
                     <tr key={idx} className="hover:bg-gray-50">
@@ -404,10 +404,10 @@ export default function TrendsPage() {
         </div>
       )}
 
-      {/* 按角色族的月度对比 - 每个角色族Top 5 */}
+      {/* Monthly Comparison by Role Family - Top 5 per Role Family */}
       {trends.monthly_comparison && trends.monthly_comparison.by_role_family && Object.keys(trends.monthly_comparison.by_role_family).length > 0 && (
         <div className="bg-white rounded-lg shadow p-6 mb-6">
-          <h2 className="text-xl font-semibold mb-4">各角色族上月 vs 本月关键词对比（Top 5）</h2>
+          <h2 className="text-xl font-semibold mb-4">Last Month vs This Month Keyword Comparison by Role Family (Top 5)</h2>
           <div className="grid md:grid-cols-2 gap-6">
             {Object.entries(trends.monthly_comparison.by_role_family).map(([roleFamily, comparisons]) => {
               if (comparisons.length === 0) return null
@@ -421,10 +421,10 @@ export default function TrendsPage() {
                     <table className="min-w-full divide-y divide-gray-200">
                       <thead className="bg-gray-50">
                         <tr>
-                          <th className="px-2 py-2 text-left text-xs font-medium text-gray-500 uppercase">关键词</th>
-                          <th className="px-2 py-2 text-left text-xs font-medium text-gray-500 uppercase">上月</th>
-                          <th className="px-2 py-2 text-left text-xs font-medium text-gray-500 uppercase">本月</th>
-                          <th className="px-2 py-2 text-left text-xs font-medium text-gray-500 uppercase">变化</th>
+                          <th className="px-2 py-2 text-left text-xs font-medium text-gray-500 uppercase">Keyword</th>
+                          <th className="px-2 py-2 text-left text-xs font-medium text-gray-500 uppercase">Last Month</th>
+                          <th className="px-2 py-2 text-left text-xs font-medium text-gray-500 uppercase">This Month</th>
+                          <th className="px-2 py-2 text-left text-xs font-medium text-gray-500 uppercase">Change</th>
                         </tr>
                       </thead>
                       <tbody className="bg-white divide-y divide-gray-200">
@@ -436,10 +436,10 @@ export default function TrendsPage() {
                             'unchanged': 'bg-gray-100 text-gray-800'
                           }
                           const statusLabels = {
-                            'new': '新增',
-                            'increased': '增长',
-                            'decreased': '下降',
-                            'unchanged': '不变'
+                            'new': 'New',
+                            'increased': 'Increased',
+                            'decreased': 'Decreased',
+                            'unchanged': 'Unchanged'
                           }
                           return (
                             <tr key={idx} className="hover:bg-gray-50">
@@ -465,15 +465,15 @@ export default function TrendsPage() {
         </div>
       )}
 
-      {/* 文本列表：角色族关键词 */}
+      {/* Text List: Role Family Keywords */}
       {Object.keys(trends.top_keywords_by_role_family).length > 0 && (
         <div className="bg-white rounded-lg shadow p-6">
-          <h2 className="text-xl font-semibold mb-4">各角色族Top关键词</h2>
+          <h2 className="text-xl font-semibold mb-4">Top Keywords by Role Family</h2>
           <div className="grid md:grid-cols-2 gap-6">
             {Object.entries(trends.top_keywords_by_role_family).map(([roleFamily, keywords]) => {
-              // 获取角色族的背景色和文字色
+              // Get role family background and text colours
               const bgColor = roleFamilyColors[roleFamily.toLowerCase()] || '#4f46e5'
-              // 深色背景使用白色文字
+              // Use white text on dark background
               const textColor = '#ffffff'
               
               return (
@@ -485,7 +485,7 @@ export default function TrendsPage() {
                         key={idx}
                         className="px-2 py-1 rounded text-xs font-medium"
                         style={{ backgroundColor: bgColor, color: textColor }}
-                        title={`出现 ${kw.count} 次`}
+                        title={`Occurred ${kw.count} times`}
                       >
                         {kw.term} ({kw.count})
                       </span>

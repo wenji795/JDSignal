@@ -49,12 +49,12 @@ export default function ManualJobPage() {
       setSuccess(true)
       setJobId(data.id)
       
-      // 3秒后跳转到职位详情页
+      // Redirect to job detail page after 3 seconds
       setTimeout(() => {
         router.push(`/jobs/${data.id}`)
       }, 3000)
     } catch (err) {
-      setError(err instanceof Error ? err.message : '提交失败')
+      setError(err instanceof Error ? err.message : 'Submission failed')
     } finally {
       setLoading(false)
     }
@@ -62,17 +62,17 @@ export default function ManualJobPage() {
 
   return (
     <div className="max-w-4xl mx-auto mt-8">
-      <h1 className="text-3xl font-bold mb-6">手动输入职位JD</h1>
+      <h1 className="text-3xl font-bold mb-6">Manual Job JD Input</h1>
       
       {success && (
         <div className="bg-green-50 border border-green-200 rounded-lg p-4 mb-6">
-          <p className="text-green-800 font-semibold">✓ 职位已成功创建！</p>
+          <p className="text-green-800 font-semibold">✓ Job successfully created!</p>
           <p className="text-green-600 text-sm mt-1">
-            正在跳转到职位详情页...（3秒后自动跳转）
+            Redirecting to job detail page... (auto-redirect in 3 seconds)
           </p>
           {jobId && (
             <p className="text-green-600 text-sm mt-1">
-              职位ID: {jobId}
+              Job ID: {jobId}
             </p>
           )}
         </div>
@@ -80,7 +80,7 @@ export default function ManualJobPage() {
 
       {error && (
         <div className="bg-red-50 border border-red-200 rounded-lg p-4 mb-6">
-          <p className="text-red-800 font-semibold">✗ 错误</p>
+          <p className="text-red-800 font-semibold">✗ Error</p>
           <p className="text-red-600 text-sm mt-1">{error}</p>
         </div>
       )}
@@ -89,7 +89,7 @@ export default function ManualJobPage() {
         <div className="space-y-4">
           <div>
             <label className="block text-sm font-medium mb-1">
-              职位标题 <span className="text-red-500">*</span>
+              Job Title <span className="text-red-500">*</span>
             </label>
             <input
               type="text"
@@ -97,49 +97,49 @@ export default function ManualJobPage() {
               onChange={(e) => setFormData({ ...formData, title: e.target.value })}
               className="w-full p-2 border rounded"
               required
-              placeholder="例如：Senior Python Developer"
+              placeholder="e.g., Senior Python Developer"
             />
           </div>
 
           <div>
-            <label className="block text-sm font-medium mb-1">公司名称</label>
+            <label className="block text-sm font-medium mb-1">Company Name</label>
             <input
               type="text"
               value={formData.company}
               onChange={(e) => setFormData({ ...formData, company: e.target.value })}
               className="w-full p-2 border rounded"
-              placeholder="例如：TechCorp Inc"
+              placeholder="e.g., TechCorp Inc"
             />
           </div>
 
           <div>
-            <label className="block text-sm font-medium mb-1">工作地点</label>
+            <label className="block text-sm font-medium mb-1">Location</label>
             <input
               type="text"
               value={formData.location}
               onChange={(e) => setFormData({ ...formData, location: e.target.value })}
               className="w-full p-2 border rounded"
-              placeholder="例如：Auckland, New Zealand"
+              placeholder="e.g., Auckland, New Zealand"
             />
           </div>
 
           <div>
-            <label className="block text-sm font-medium mb-1">职位URL（可选）</label>
+            <label className="block text-sm font-medium mb-1">Job URL (Optional)</label>
             <input
               type="url"
               value={formData.url}
               onChange={(e) => setFormData({ ...formData, url: e.target.value })}
               className="w-full p-2 border rounded"
-              placeholder="例如：https://www.seek.co.nz/job/12345678"
+              placeholder="e.g., https://www.seek.co.nz/job/12345678"
             />
             <p className="text-xs text-gray-500 mt-1">
-              如果提供URL，系统会检查是否已存在，避免重复
+              If URL is provided, the system will check for duplicates to avoid repetition
             </p>
           </div>
 
           <div>
             <label className="block text-sm font-medium mb-1">
-              职位描述（JD文本） <span className="text-red-500">*</span>
+              Job Description (JD Text) <span className="text-red-500">*</span>
             </label>
             <textarea
               value={formData.jd_text}
@@ -147,10 +147,10 @@ export default function ManualJobPage() {
               className="w-full p-2 border rounded"
               rows={15}
               required
-              placeholder="粘贴职位描述文本..."
+              placeholder="Paste job description text..."
             />
             <p className="text-xs text-gray-500 mt-1">
-              系统会自动提取关键词、推断角色族和资历级别
+              The system will automatically extract keywords, infer role family and seniority level
             </p>
           </div>
 
@@ -160,14 +160,14 @@ export default function ManualJobPage() {
               disabled={loading}
               className="px-6 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 disabled:bg-gray-400"
             >
-              {loading ? '提交中...' : '提交'}
+              {loading ? 'Submitting...' : 'Submit'}
             </button>
             <button
               type="button"
               onClick={() => router.push('/jobs')}
               className="px-6 py-2 bg-gray-200 text-gray-800 rounded hover:bg-gray-300"
             >
-              返回职位列表
+              Back to Job List
             </button>
           </div>
         </div>

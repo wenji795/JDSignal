@@ -15,35 +15,35 @@ export default function JobsPage() {
   })
 
   const roleFamilies = [
-    'testing',  // 软件测试（用户最关心）
-    'ai',       // AI/机器学习
+    'testing',  // Software Testing
+    'ai',       // AI/Machine Learning
     'fullstack', 
-    'frontend', // 前端/UI/UX
+    'frontend', // Frontend/UI/UX
     'devops', 
     'data',
-    'business analyst', // 业务分析师
-    'product manager', // 产品经理
+    'business analyst', // Business Analyst
+    'product manager', // Product Manager
     'mobile',
-    '其他'      // 其他角色
+    '其他'      // Other roles
   ]
   
-  // 角色族中文显示名称
+  // Role family display labels
   const roleFamilyLabels: Record<string, string> = {
-    'testing': '软件测试',
-    'ai': 'AI/机器学习',
-    'fullstack': '全栈',
-    'frontend': '前端/UI/UX',
+    'testing': 'Software Testing',
+    'ai': 'AI/Machine Learning',
+    'fullstack': 'Full Stack',
+    'frontend': 'Frontend/UI/UX',
     'devops': 'DevOps',
-    'data': '数据',
-    'business analyst': '业务分析师',
-    'product manager': '产品经理',
-    'mobile': '移动开发',
-    '其他': '其他'
+    'data': 'Data',
+    'business analyst': 'Business Analyst',
+    'product manager': 'Product Manager',
+    'mobile': 'Mobile Development',
+    '其他': 'Other'
   }
-  // 只显示：graduate, junior, intermediate (映射到mid), senior, manager, lead, architect, unknown
+  // Only show: graduate, junior, intermediate (mapped to mid), senior, manager, lead, architect, unknown
   const seniorities = ['graduate', 'junior', 'intermediate', 'senior', 'manager', 'lead', 'architect', 'unknown']
   
-  // 资历级别显示名称映射
+  // Seniority level display labels
   const seniorityLabels: Record<string, string> = {
     'graduate': 'Graduate',
     'junior': 'Junior',
@@ -52,10 +52,10 @@ export default function JobsPage() {
     'manager': 'Manager',
     'lead': 'Lead',
     'architect': 'Architect',
-    'unknown': '资历不明'
+    'unknown': 'Unknown'
   }
   
-  // 角色族颜色映射（深色背景+白色文字）
+  // Role family colour mapping (dark background + white text)
   const roleFamilyColors: Record<string, string> = {
     'testing': 'bg-pink-600 text-white',
     'ai': 'bg-purple-600 text-white',
@@ -69,7 +69,7 @@ export default function JobsPage() {
     '其他': 'bg-gray-600 text-white'
   }
   
-  // 资历级别颜色映射（浅色背景+深色文字）
+  // Seniority level colour mapping (light background + dark text)
   const seniorityColors: Record<string, string> = {
     'graduate': 'bg-lime-100 text-lime-900',
     'junior': 'bg-yellow-100 text-yellow-900',
@@ -79,18 +79,18 @@ export default function JobsPage() {
     'lead': 'bg-indigo-100 text-indigo-900',
     'architect': 'bg-cyan-100 text-cyan-900',
     'unknown': 'bg-gray-100 text-gray-900',
-    'mid': 'bg-amber-100 text-amber-900' // intermediate的映射
+    'mid': 'bg-amber-100 text-amber-900' // mapping for intermediate
   }
 
   useEffect(() => {
     loadJobs()
   }, [filters])
   
-  // 每30秒自动刷新一次职位列表
+  // Auto-refresh job list every 30 seconds
   useEffect(() => {
     const interval = setInterval(() => {
       loadJobs()
-    }, 30000) // 30秒
+    }, 30000) // 30 seconds
     
     return () => clearInterval(interval)
   }, [filters])
@@ -98,7 +98,7 @@ export default function JobsPage() {
   const loadJobs = async () => {
     try {
       setLoading(true)
-      // 确保空字符串不被发送（后端会将其视为有效值）
+      // Ensure empty strings are not sent (backend will treat them as valid values)
       const params: {
         role_family?: string;
         seniority?: string;
@@ -124,8 +124,8 @@ export default function JobsPage() {
   if (loading) {
     return (
       <div className="text-center py-12">
-        <div className="text-lg mb-2">加载中...</div>
-        <div className="text-sm text-gray-500">正在连接后端API (http://127.0.0.1:8000)</div>
+        <div className="text-lg mb-2">Loading...</div>
+        <div className="text-sm text-gray-500">Connecting to backend API (http://127.0.0.1:8000)</div>
       </div>
     )
   }
@@ -133,13 +133,13 @@ export default function JobsPage() {
   if (error) {
     return (
       <div className="text-red-500 py-12">
-        <div className="text-xl font-semibold mb-2">错误: {error}</div>
+        <div className="text-xl font-semibold mb-2">Error: {error}</div>
         <div className="text-sm text-gray-600 mt-4">
-          <p>请检查：</p>
+          <p>Please check:</p>
           <ul className="list-disc list-inside mt-2">
-            <li>后端服务是否运行在 http://127.0.0.1:8000</li>
-            <li>运行命令: <code className="bg-gray-100 px-2 py-1 rounded">cd backend && uvicorn app.main:app --reload</code></li>
-            <li>浏览器控制台是否有更多错误信息</li>
+            <li>Is the backend service running at http://127.0.0.1:8000</li>
+            <li>Run command: <code className="bg-gray-100 px-2 py-1 rounded">cd backend && uvicorn app.main:app --reload</code></li>
+            <li>Check browser console for more error information</li>
           </ul>
         </div>
       </div>
@@ -149,26 +149,26 @@ export default function JobsPage() {
   return (
     <div>
       <div className="flex justify-between items-center mb-6">
-        <h1 className="text-3xl font-bold">职位列表</h1>
+        <h1 className="text-3xl font-bold">Job List</h1>
         <button
           onClick={() => loadJobs()}
           disabled={loading}
           className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 disabled:bg-gray-400"
         >
-          {loading ? '刷新中...' : '刷新'}
+          {loading ? 'Refreshing...' : 'Refresh'}
         </button>
       </div>
       
-      {/* 过滤器 */}
+      {/* Filters */}
       <div className="bg-gray-50 p-4 rounded-lg mb-6 flex gap-4 items-end">
         <div className="flex-1">
-          <label className="block text-sm font-medium mb-1">角色族</label>
+          <label className="block text-sm font-medium mb-1">Role Family</label>
           <select
             value={filters.role_family}
             onChange={(e) => setFilters({ ...filters, role_family: e.target.value })}
             className="w-full p-2 border rounded"
           >
-            <option value="">全部</option>
+            <option value="">All</option>
             {roleFamilies.map(rf => (
               <option key={rf} value={rf}>{roleFamilyLabels[rf] || rf}</option>
             ))}
@@ -176,13 +176,13 @@ export default function JobsPage() {
         </div>
         
         <div className="flex-1">
-          <label className="block text-sm font-medium mb-1">资历级别</label>
+          <label className="block text-sm font-medium mb-1">Seniority Level</label>
           <select
             value={filters.seniority}
             onChange={(e) => setFilters({ ...filters, seniority: e.target.value })}
             className="w-full p-2 border rounded"
           >
-            <option value="">全部</option>
+            <option value="">All</option>
             {seniorities.map(s => (
               <option key={s} value={s === 'intermediate' ? 'mid' : s}>
                 {seniorityLabels[s] || s}
@@ -195,13 +195,13 @@ export default function JobsPage() {
           onClick={() => setFilters({ role_family: '', seniority: '' })}
           className="px-4 py-2 bg-gray-200 rounded hover:bg-gray-300"
         >
-          重置
+          Reset
         </button>
       </div>
 
-      {/* 职位列表 */}
+      {/* Job list */}
       {jobs.length === 0 ? (
-        <div className="text-center py-12 text-gray-500">暂无职位</div>
+        <div className="text-center py-12 text-gray-500">No jobs available</div>
       ) : (
         <div className="grid gap-4">
           {jobs.map(job => (
@@ -236,11 +236,11 @@ export default function JobsPage() {
                                                job.seniority === 'manager' ? 'Manager' :
                                                job.seniority === 'lead' ? 'Lead' :
                                                job.seniority === 'architect' ? 'Architect' :
-                                               job.seniority === 'unknown' ? '资历不明' :
+                                               job.seniority === 'unknown' ? 'Unknown' :
                                                job.seniority;
                       const colorKey = displaySeniority.toLowerCase() === 'graduate' ? 'graduate' :
                                        displaySeniority.toLowerCase() === 'intermediate' ? 'intermediate' :
-                                       displaySeniority.toLowerCase() === '资历不明' ? 'unknown' :
+                                       displaySeniority.toLowerCase() === 'unknown' ? 'unknown' :
                                        job.seniority;
                       return (
                         <span className={`px-2 py-1 rounded text-xs font-medium ${seniorityColors[colorKey] || 'bg-gray-100 text-gray-900'}`}>
@@ -262,7 +262,7 @@ export default function JobsPage() {
                   <div>{new Date(job.captured_at).toLocaleDateString()}</div>
                   {job.extraction && (
                     <div className="mt-1 text-xs text-green-600">
-                      {job.extraction.keywords_json.keywords.length} 关键词
+                      {job.extraction.keywords_json.keywords.length} keywords
                     </div>
                   )}
                 </div>
