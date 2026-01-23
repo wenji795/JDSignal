@@ -48,7 +48,21 @@ async def capture_job(capture_data: CaptureRequest, session: Session = Depends(g
             # 如果已存在，返回现有职位信息
             extraction = session.exec(select(Extraction).where(Extraction.job_id == existing.id)).first()
             keywords_data = extraction.keywords_json.get("keywords", []) if extraction else []
-            top_keywords = keywords_data[:20] if keywords_data else []
+            
+            # 统一转换为字典格式（CaptureResponse期望字典列表）
+            top_keywords = []
+            if keywords_data:
+                for kw in keywords_data[:20]:  # 取前20个
+                    if isinstance(kw, dict):
+                        # 已经是字典格式，直接使用
+                        top_keywords.append(kw)
+                    elif isinstance(kw, str):
+                        # 字符串格式，转换为字典格式
+                        top_keywords.append({
+                            "term": kw,
+                            "category": "unknown",
+                            "score": 1.0
+                        })
             
             return CaptureResponse(
                 job_id=existing.id,
@@ -137,7 +151,21 @@ async def capture_job(capture_data: CaptureRequest, session: Session = Depends(g
     
     # 获取top 20关键词
     keywords_data = extraction.keywords_json.get("keywords", [])
-    top_keywords = keywords_data[:20] if keywords_data else []  # 取前20个（已经按分数排序）
+    
+    # 统一转换为字典格式（CaptureResponse期望字典列表）
+    top_keywords = []
+    if keywords_data:
+        for kw in keywords_data[:20]:  # 取前20个
+            if isinstance(kw, dict):
+                # 已经是字典格式，直接使用
+                top_keywords.append(kw)
+            elif isinstance(kw, str):
+                # 字符串格式，转换为字典格式
+                top_keywords.append({
+                    "term": kw,
+                    "category": "unknown",
+                    "score": 1.0
+                })
     
     return CaptureResponse(
         job_id=job.id,
