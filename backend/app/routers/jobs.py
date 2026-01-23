@@ -181,6 +181,7 @@ def list_jobs(
         for condition in conditions:
             statement = statement.where(condition)
     
+    # 先按captured_at降序获取所有数据（用于去重）
     statement = statement.order_by(Job.captured_at.desc())
     jobs = session.exec(statement).all()
     
@@ -208,8 +209,8 @@ def list_jobs(
                     unique_jobs[index] = job
                     seen_jobs[key] = job
     
-    # 去重后重新按captured_at降序排序，确保最新的在最前面
-    unique_jobs.sort(key=lambda j: j.captured_at if j.captured_at else datetime.min, reverse=True)
+    # 去重后按posted_date降序排序（如果有），否则使用captured_at，确保最近的在最前面
+    unique_jobs.sort(key=lambda j: j.posted_date if j.posted_date else (j.captured_at if j.captured_at else datetime.min), reverse=True)
     
     # 构建响应
     result = []

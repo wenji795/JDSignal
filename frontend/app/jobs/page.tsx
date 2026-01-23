@@ -114,7 +114,14 @@ export default function JobsPage() {
       
       const data = await getJobs(params)
       // 强制更新状态，即使数据为空也要清空之前的数据
-      setJobs(Array.isArray(data) ? data : [])
+      const jobsArray = Array.isArray(data) ? data : []
+      // 按posted_date排序，最近的在最前面（如果有posted_date），否则使用captured_at
+      jobsArray.sort((a, b) => {
+        const dateA = a.posted_date ? new Date(a.posted_date).getTime() : (a.captured_at ? new Date(a.captured_at).getTime() : 0)
+        const dateB = b.posted_date ? new Date(b.posted_date).getTime() : (b.captured_at ? new Date(b.captured_at).getTime() : 0)
+        return dateB - dateA // 降序排序，最新的在前面
+      })
+      setJobs(jobsArray)
       setError(null)
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to load jobs')
