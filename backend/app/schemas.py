@@ -103,12 +103,28 @@ class ExtractionResponse(BaseModel):
     keywords_json: Dict[str, Any]
     must_have_json: Dict[str, Any]
     nice_to_have_json: Dict[str, Any]
-    years_required: Optional[int]
+    years_required: Optional[int] = None
     degree_required: Optional[str]
     certifications_json: Dict[str, Any]
     summary: Optional[str] = None  # AI生成的职位摘要
     extraction_method: Optional[str] = None  # 提取方法：ai-enhanced 或 rule-based
     extracted_at: datetime
+
+    @field_validator('years_required', mode='before')
+    @classmethod
+    def convert_years_required(cls, v):
+        """将浮点数转换为整数（向下取整）"""
+        if v is None:
+            return None
+        if isinstance(v, float):
+            return int(v)  # 向下取整
+        if isinstance(v, str):
+            try:
+                # 尝试解析字符串
+                return int(float(v))
+            except (ValueError, TypeError):
+                return None
+        return int(v) if v is not None else None
 
     model_config = {"from_attributes": True}
 
