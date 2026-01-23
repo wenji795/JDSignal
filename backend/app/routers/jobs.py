@@ -228,6 +228,7 @@ def list_jobs(
             "status": job.status,
             "role_family": job.role_family,
             "seniority": job.seniority,
+            "industry": job.industry,
             "extraction": ExtractionResponse(
                 id=extraction.id,
                 job_id=extraction.job_id,
@@ -267,6 +268,7 @@ def get_job(job_id: UUID, session: Session = Depends(get_session)):
         "status": job.status,
         "role_family": job.role_family,
         "seniority": job.seniority,
+        "industry": job.industry,
         "extraction": ExtractionResponse(
             id=extraction.id,
             job_id=extraction.job_id,
@@ -331,6 +333,7 @@ def update_job(job_id: UUID, job_data: JobUpdate, session: Session = Depends(get
         "status": job.status,
         "role_family": job.role_family,
         "seniority": job.seniority,
+        "industry": job.industry,
         "extraction": ExtractionResponse(
             id=extraction.id,
             job_id=extraction.job_id,

@@ -43,6 +43,7 @@ class Job(SQLModel, table=True):
     status: JobStatus = Field(default=JobStatus.NEW, index=True)
     role_family: Optional[str] = Field(default=None, index=True)  # 如：backend, frontend, fullstack, devops等
     seniority: Optional[Seniority] = Field(default=None, index=True)
+    industry: Optional[str] = Field(default=None, index=True)  # 行业分类（如：Information & Communication Technology, Manufacturing等）
     
     # 关联的提取结果
     extraction: Optional["Extraction"] = Relationship(back_populates="job", sa_relationship_kwargs={"uselist": False})

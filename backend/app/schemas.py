@@ -143,6 +143,7 @@ class JobResponse(BaseModel):
     status: JobStatus
     role_family: Optional[str]
     seniority: Optional[Seniority]
+    industry: Optional[str] = None
     extraction: Optional[ExtractionResponse] = None
 
     model_config = {"from_attributes": True}
@@ -185,6 +186,7 @@ class CaptureRequest(BaseModel):
     extracted_text: str = Field(..., description="用户主动提取的文本（DOM提取或选中文本）", examples=["We are looking for a Senior Python Developer..."])
     captured_at: Optional[datetime] = Field(None, description="捕获时间（如果不提供则使用当前时间）")
     posted_date: Optional[datetime] = Field(None, description="职位发布日期（如果可用）")
+    industry: Optional[str] = Field(None, description="行业分类", examples=["Information & Communication Technology"])
     
     model_config = {
         "json_schema_extra": {

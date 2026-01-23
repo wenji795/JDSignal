@@ -99,7 +99,8 @@ async def capture_job(capture_data: CaptureRequest, session: Session = Depends(g
         "status": JobStatus.NEW,
         "role_family": role_family,
         "seniority": seniority,
-        "captured_at": captured_at
+        "captured_at": captured_at,
+        "industry": capture_data.industry
     }
     
     # 创建Job

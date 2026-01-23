@@ -98,6 +98,7 @@ export default function JobsPage() {
   const loadJobs = async () => {
     try {
       setLoading(true)
+      setError(null)
       // Ensure empty strings are not sent (backend will treat them as valid values)
       const params: {
         role_family?: string;
@@ -112,10 +113,13 @@ export default function JobsPage() {
       }
       
       const data = await getJobs(params)
-      setJobs(data)
+      // 强制更新状态，即使数据为空也要清空之前的数据
+      setJobs(Array.isArray(data) ? data : [])
       setError(null)
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to load jobs')
+      // 如果出错，也清空jobs列表
+      setJobs([])
     } finally {
       setLoading(false)
     }

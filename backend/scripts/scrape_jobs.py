@@ -658,6 +658,24 @@ async def scrape_seek_job(page: Page, job_url: str) -> Optional[Dict[str, Any]]:
             if body_elem:
                 job_data['jd_text'] = (await body_elem.inner_text())[:5000]
         
+        # 提取行业分类信息（从data-automation="job-detail-classifications"）
+        industry_selectors = [
+            '[data-automation="job-detail-classifications"]',
+            '[data-automation*="classification"]',
+            '[data-automation*="category"]',
+        ]
+        for selector in industry_selectors:
+            try:
+                industry_elem = await page.query_selector(selector)
+                if industry_elem:
+                    industry_text = (await industry_elem.inner_text()).strip()
+                    if industry_text:
+                        job_data['industry'] = industry_text
+                        print(f"  ✓ 提取行业分类: {industry_text}")
+                        break
+            except:
+                continue
+        
         job_data['url'] = job_url
         job_data['page_title'] = await page.title()
         
@@ -735,7 +753,7 @@ def is_nz_location(location: Optional[str]) -> bool:
     return False
 
 
-def is_non_it_job(title: str, jd_text: str = "") -> bool:
+def is_non_it_job(title: str, jd_text: str = "", industry: str = "") -> bool:
     """
     检查职位是否是非IT岗位
     
@@ -779,9 +797,30 @@ def is_non_it_job(title: str, jd_text: str = "") -> bool:
     # 特殊处理：Quality相关职位需要检查是否是IT Quality
     # Quality Specialist, Quality Control等可能是制造/生产相关，需要检查上下文
     quality_keywords = ['quality specialist', 'quality control', 'quality assurance', 'quality manager', 
-                        'quality coordinator', 'quality analyst', 'quality technician']
+                        'quality coordinator', 'quality analyst', 'quality technician', 'qa specialist', 'qa/qc']
     
     if any(keyword in title_lower for keyword in quality_keywords):
+        # 首先检查行业信息（优先级最高）
+        industry_lower = industry.lower() if industry else ""
+        
+        # 非IT行业关键词（需要过滤）
+        non_it_industries = [
+            'manufacturing', 'manufacturing, transport & logistics', 'manufacturing, transport',
+            'transport & logistics', 'logistics', 'warehouse', 'supply chain',
+            'food', 'food & beverage', 'food safety', 'food production',
+            'science', 'scientific', 'laboratory', 'research', 'pharmaceutical',
+            'biotechnology', 'biotech', 'medical', 'healthcare',
+            'agriculture', 'farming', 'horticulture',
+            'retail', 'wholesale', 'distribution',
+            'construction', 'building', 'civil engineering',
+            'automotive', 'automotive manufacturing'
+        ]
+        
+        # 如果行业明确是非IT行业，直接过滤
+        if industry_lower and any(non_it_ind in industry_lower for non_it_ind in non_it_industries):
+            print(f"  ⏭ 过滤非IT行业QA职位: {industry}")
+            return True
+        
         # 检查是否是IT Quality（软件测试、QA等）
         it_quality_indicators = [
             'software', 'qa', 'test', 'testing', 'automation', 'selenium', 'cypress',
@@ -814,16 +853,50 @@ def is_non_it_job(title: str, jd_text: str = "") -> bool:
         
         # 如果没有IT Quality上下文，根据用户要求：和quality有关的都要查看是不是IT行业，不是就不要抓到职位列表
         if not has_it_quality_context:
-            # 检查标题中是否有明确的IT Quality关键词
+            # 检查标题中是否有明确的IT Quality关键词（更严格的列表）
             title_has_it_keyword = any(kw in title_lower for kw in [
                 'qa engineer', 'test engineer', 'quality assurance engineer',
                 'qa specialist', 'test specialist', 'software quality',
-                'qa automation', 'test automation', 'qa lead', 'test lead'
+                'qa automation', 'test automation', 'qa lead', 'test lead',
+                'software tester', 'test developer', 'qa developer',
+                'test automation engineer', 'qa analyst', 'testing engineer',
+                'software qa', 'it qa', 'it quality assurance'
             ])
             
-            # 如果标题没有明确的IT关键词，则过滤掉（严格模式）
+            # 检查行业是否是IT相关
+            it_industries = [
+                'information & communication technology', 'information technology',
+                'it', 'software', 'technology', 'computer', 'internet',
+                'telecommunications', 'data', 'digital', 'tech'
+            ]
+            is_it_industry = industry_lower and any(it_ind in industry_lower for it_ind in it_industries)
+            
+            # 增强检查：即使行业信息缺失，也要严格检查
+            # 如果标题没有明确的IT关键词，且：
+            # 1. 行业信息缺失或不是IT行业，且
+            # 2. JD中没有IT上下文
+            # 则过滤掉（严格模式）
             if not title_has_it_keyword:
-                return True
+                # 如果行业信息缺失，需要更严格的JD检查
+                if not industry_lower:
+                    # 行业信息缺失时，检查JD中是否有明确的IT关键词
+                    # 如果JD中也没有IT关键词，则过滤掉
+                    jd_it_keywords = [
+                        'software', 'application', 'system', 'web', 'mobile',
+                        'it ', 'information technology', 'automation', 'selenium',
+                        'test automation', 'api testing', 'performance testing',
+                        'agile', 'scrum', 'devops', 'ci/cd', 'bug', 'defect',
+                        'test case', 'test plan', 'jira', 'testrail'
+                    ]
+                    has_jd_it_keywords = any(kw in text for kw in jd_it_keywords)
+                    
+                    if not has_jd_it_keywords:
+                        print(f"  ⏭ 过滤QA职位（行业信息缺失且无IT上下文）: {title}")
+                        return True
+                elif not is_it_industry:
+                    # 行业明确不是IT，且标题没有IT关键词，过滤掉
+                    print(f"  ⏭ 过滤非IT行业QA职位（标题无IT关键词）: {title} (行业: {industry})")
+                    return True
     
     # 特殊处理：先检查明确的非IT岗位（优先级最高）
     # Site Engineer是建筑/施工相关，不是IT
@@ -958,8 +1031,9 @@ async def save_job_to_api(job_data: Dict[str, Any], source: str) -> bool:
         # 检查是否是非IT岗位
         title = job_data.get('title', '')
         jd_text = job_data.get('jd_text', '')
-        if is_non_it_job(title, jd_text):
-            print(f"⏭ 跳过非IT岗位: {title}")
+        industry = job_data.get('industry', '')
+        if is_non_it_job(title, jd_text, industry):
+            print(f"⏭ 跳过非IT岗位: {title} (行业: {industry if industry else '未知'})")
             return False
         
         # 确定来源（只支持Seek）
@@ -994,6 +1068,7 @@ async def save_job_to_api(job_data: Dict[str, Any], source: str) -> bool:
             "location_guess": job_data.get('location'),
             "extracted_text": job_data.get('jd_text', ''),
             "posted_date": posted_date.isoformat() if posted_date else None,
+            "industry": job_data.get('industry'),
         }
         
         # 调用capture端点

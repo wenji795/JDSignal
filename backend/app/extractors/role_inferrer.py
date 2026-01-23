@@ -31,7 +31,13 @@ def infer_role_family(title: str, jd_text: str = "") -> Optional[str]:
         'test automation engineer', 'qa analyst', 'test specialist', 'qa specialist',
         'testing engineer', 'test lead', 'qa lead', 'test manager',
         'quality engineer', 'test developer', 'qa developer',
-        'automation tester', 'manual tester', 'performance tester', 'security tester'
+        'automation tester', 'manual tester', 'performance tester', 'security tester',
+        # 完整的QA职位标题形式
+        'quality assurance specialist', 'quality assurance officer', 'quality assurance manager',
+        'quality assurance coordinator', 'quality assurance analyst', 'quality assurance lead',
+        'qa specialist', 'qa officer', 'qa manager', 'qa coordinator', 'qa analyst', 'qa lead',
+        'software quality assurance', 'software qa', 'it quality assurance', 'it qa',
+        'test specialist', 'test officer', 'test coordinator'
     ]
     
     # AI相关关键词
@@ -111,9 +117,27 @@ def infer_role_family(title: str, jd_text: str = "") -> Optional[str]:
     ]
     
     # 第一步：检查标题中的明确职位类型关键词（优先级最高）
-    # 优先检查数据相关关键词（包括"data"关键词）
-    # 检查标题中是否包含"data"关键词（使用单词边界，避免匹配"database"等词的一部分）
-    if re.search(r'\bdata\b', title_lower):
+    # 优先检查数据相关关键词（只检查明确的data职位关键词，避免误判）
+    # 检查标题中是否包含明确的data职位关键词（如"data engineer", "data scientist"等）
+    data_title_patterns = [
+        r'\bdata\s+engineer\b',
+        r'\bdata\s+scientist\b',
+        r'\bdata\s+analyst\b',
+        r'\bdata\s+architect\b',
+        r'\bdata\s+developer\b',
+        r'\bmachine\s+learning\s+engineer\b',
+        r'\bml\s+engineer\b',
+        r'\bbi\s+analyst\b',
+        r'\bbusiness\s+intelligence\s+analyst\b'
+    ]
+    for pattern in data_title_patterns:
+        if re.search(pattern, title_lower, re.IGNORECASE):
+            return 'data'
+    
+    # 如果标题中只有单独的"data"关键词（没有明确的职位类型），检查是否在明确的职位上下文中
+    # 例如："Data Engineer"中的"data"是明确的，但"Developer" + JD中提到"data structures"不应该匹配
+    # 这里只检查标题，如果标题中只有"data"且没有其他职位关键词，可能是data相关职位
+    if re.search(r'\bdata\b', title_lower) and not any(keyword in title_lower for keyword in general_dev_keywords):
         return 'data'
     
     # 测试岗位（必须在标题中明确，避免误判JD中的技能要求）
@@ -172,9 +196,22 @@ def infer_role_family(title: str, jd_text: str = "") -> Optional[str]:
     
     # 第二步：如果标题中有通用开发关键词，根据JD中的技术栈推断
     if any(keyword in title_lower for keyword in general_dev_keywords):
-        # 优先检查JD中是否包含"data"关键词（使用单词边界）
-        if re.search(r'\bdata\b', jd_lower):
-            return 'data'
+        # 检查JD中是否包含明确的data相关职位关键词（避免误判"data structures"等通用术语）
+        # 只检查明确的data职位关键词，如"data engineer", "data scientist", "data analyst"等
+        data_job_patterns = [
+            r'\bdata\s+engineer\b',
+            r'\bdata\s+scientist\b',
+            r'\bdata\s+analyst\b',
+            r'\bdata\s+architect\b',
+            r'\bdata\s+developer\b',
+            r'\bmachine\s+learning\s+engineer\b',
+            r'\bml\s+engineer\b',
+            r'\bbi\s+analyst\b',
+            r'\bbusiness\s+intelligence\s+analyst\b'
+        ]
+        for pattern in data_job_patterns:
+            if re.search(pattern, jd_lower, re.IGNORECASE):
+                return 'data'
         
         # 检查是否是Business Analyst（需要更严格的匹配，避免误判）
         # 只在JD中明确提到Business Analyst相关职位时才归类
@@ -227,9 +264,21 @@ def infer_role_family(title: str, jd_text: str = "") -> Optional[str]:
                fullstack_title_keywords + devops_title_keywords + data_title_keywords + 
                business_analyst_keywords + product_manager_keywords + mobile_title_keywords):
         
-        # 优先检查JD中是否包含"data"关键词（使用单词边界）
-        if re.search(r'\bdata\b', jd_lower):
-            return 'data'
+        # 检查JD中是否包含明确的data相关职位关键词（避免误判"data structures"等通用术语）
+        data_job_patterns = [
+            r'\bdata\s+engineer\b',
+            r'\bdata\s+scientist\b',
+            r'\bdata\s+analyst\b',
+            r'\bdata\s+architect\b',
+            r'\bdata\s+developer\b',
+            r'\bmachine\s+learning\s+engineer\b',
+            r'\bml\s+engineer\b',
+            r'\bbi\s+analyst\b',
+            r'\bbusiness\s+intelligence\s+analyst\b'
+        ]
+        for pattern in data_job_patterns:
+            if re.search(pattern, jd_lower, re.IGNORECASE):
+                return 'data'
         
         # 检查JD中的关键词（但要求更严格）
         if any(keyword in jd_lower for keyword in testing_title_keywords):
