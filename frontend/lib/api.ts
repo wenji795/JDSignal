@@ -85,6 +85,11 @@ export interface TrendsResponse {
       status: 'new' | 'increased' | 'decreased' | 'unchanged';
     }>>;
   };
+  extraction_coverage?: {
+    total_jobs_all: number;
+    total_jobs_with_extraction: number;
+    coverage_rate: number;
+  };
 }
 
 /**

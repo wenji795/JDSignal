@@ -200,8 +200,37 @@ export default function TrendsPage() {
 
       {/* Total Jobs */}
       <div className="bg-blue-50 border border-blue-200 rounded-lg p-6 mb-6">
-        <div className="text-2xl font-bold text-blue-800">{trends.total_jobs}</div>
-        <div className="text-blue-600">Total Jobs</div>
+        <div className="flex items-center justify-between">
+          <div>
+            <div className="text-2xl font-bold text-blue-800">{trends.total_jobs}</div>
+            <div className="text-blue-600">Total Jobs (with extraction)</div>
+          </div>
+          {trends.extraction_coverage && trends.extraction_coverage.total_jobs_all > trends.extraction_coverage.total_jobs_with_extraction && (
+            <div className="text-right">
+              <div className="text-sm text-gray-600">
+                <div>Total: {trends.extraction_coverage.total_jobs_all}</div>
+                <div className={`font-semibold ${trends.extraction_coverage.coverage_rate < 90 ? 'text-orange-600' : 'text-green-600'}`}>
+                  Coverage: {trends.extraction_coverage.coverage_rate}%
+                </div>
+                {trends.extraction_coverage.coverage_rate < 100 && (
+                  <div className="text-xs text-gray-500 mt-1">
+                    {trends.extraction_coverage.total_jobs_all - trends.extraction_coverage.total_jobs_with_extraction} jobs pending extraction
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
+        </div>
+        {trends.extraction_coverage && trends.extraction_coverage.coverage_rate < 100 && (
+          <div className="mt-4 text-sm text-gray-600 bg-yellow-50 border border-yellow-200 rounded p-3">
+            <p className="font-semibold text-yellow-800 mb-1">⚠️ 注意：数据可能不完整</p>
+            <p className="text-yellow-700">
+              当前有 {trends.extraction_coverage.total_jobs_all - trends.extraction_coverage.total_jobs_with_extraction} 个职位的关键词提取尚未完成。
+              分析结果仅包含已完成提取的 {trends.extraction_coverage.total_jobs_with_extraction} 个职位（覆盖率 {trends.extraction_coverage.coverage_rate}%）。
+              请等待提取完成后再查看完整分析结果。
+            </p>
+          </div>
+        )}
       </div>
 
       <div className="grid md:grid-cols-2 gap-6 mb-6">

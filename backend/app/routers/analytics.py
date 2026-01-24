@@ -183,31 +183,41 @@ def get_trends(
     jobs = session.exec(job_query).all()
     job_ids = [job.id for job in jobs]
     
-    # 1. 总职位数
-    total_jobs = len(jobs)
-    
-    # 2. 按角色族统计
-    count_by_role_family = Counter()
-    for job in jobs:
-        if job.role_family:
-            count_by_role_family[job.role_family] += 1
-    
-    # 3. 按资历级别统计
-    count_by_seniority = Counter()
-    for job in jobs:
-        if job.seniority:
-            count_by_seniority[job.seniority.value] += 1
-    
-    # 4. 获取提取结果和对应的Job
+    # 4. 获取提取结果和对应的Job（只统计有Extraction的Job，确保数据一致性）
     if job_ids:
         extraction_query = select(Extraction).where(Extraction.job_id.in_(job_ids))
         extractions = session.exec(extraction_query).all()
         
         # 创建job_id到job的映射
         job_map = {job.id: job for job in jobs}
+        # 只保留有Extraction的Job
         extractions_with_jobs = [(ext, job_map.get(ext.job_id)) for ext in extractions if ext.job_id in job_map]
+        
+        # 获取有Extraction的Job ID集合
+        jobs_with_extraction_ids = {ext.job_id for ext in extractions}
+        # 过滤出有Extraction的Job
+        jobs_with_extraction = [job for job in jobs if job.id in jobs_with_extraction_ids]
     else:
         extractions_with_jobs = []
+        jobs_with_extraction = []
+    
+    # 1. 总职位数（只统计有Extraction的Job，确保数据一致性）
+    total_jobs = len(jobs_with_extraction)
+    
+    # 统计所有Job数量（用于显示提取覆盖率）
+    total_jobs_all = len(jobs)
+    
+    # 2. 按角色族统计（只统计有Extraction的Job）
+    count_by_role_family = Counter()
+    for job in jobs_with_extraction:
+        if job.role_family:
+            count_by_role_family[job.role_family] += 1
+    
+    # 3. 按资历级别统计（只统计有Extraction的Job）
+    count_by_seniority = Counter()
+    for job in jobs_with_extraction:
+        if job.seniority:
+            count_by_seniority[job.seniority.value] += 1
     
     # 5. 统计所有关键词（top 30）
     keyword_counter = Counter()
@@ -335,22 +345,26 @@ def get_trends(
     monthly_job_ids = [job.id for job in monthly_jobs]
     
     # 分别获取本月和上月的职位
-    current_month_jobs = [j for j in monthly_jobs if current_month_start <= j.captured_at <= current_month_end]
-    last_month_jobs = [j for j in monthly_jobs if last_month_start <= j.captured_at <= last_month_end]
+    current_month_jobs_all = [j for j in monthly_jobs if current_month_start <= j.captured_at <= current_month_end]
+    last_month_jobs_all = [j for j in monthly_jobs if last_month_start <= j.captured_at <= last_month_end]
     
-    if current_month_jobs or last_month_jobs:
-        # 获取本月和上月的提取结果
-        current_month_job_ids = {job.id for job in current_month_jobs}
-        last_month_job_ids = {job.id for job in last_month_jobs}
-        
+    if current_month_jobs_all or last_month_jobs_all:
         # 获取月度比较相关的提取结果
         if monthly_job_ids:
             monthly_extraction_query = select(Extraction).where(Extraction.job_id.in_(monthly_job_ids))
             monthly_extractions = session.exec(monthly_extraction_query).all()
             monthly_job_map = {job.id: job for job in monthly_jobs}
             monthly_extractions_with_jobs = [(ext, monthly_job_map.get(ext.job_id)) for ext in monthly_extractions if ext.job_id in monthly_job_map]
+            
+            # 获取有Extraction的Job ID集合
+            monthly_jobs_with_extraction_ids = {ext.job_id for ext in monthly_extractions}
+            # 只保留有Extraction的Job
+            current_month_jobs = [j for j in current_month_jobs_all if j.id in monthly_jobs_with_extraction_ids]
+            last_month_jobs = [j for j in last_month_jobs_all if j.id in monthly_jobs_with_extraction_ids]
         else:
             monthly_extractions_with_jobs = []
+            current_month_jobs = []
+            last_month_jobs = []
         
         # 总体关键词统计（所有角色族）
         current_month_counter = Counter()
@@ -359,6 +373,10 @@ def get_trends(
         # 按角色族分组的关键词统计
         current_month_by_role_family = {}  # role_family -> Counter
         last_month_by_role_family = {}     # role_family -> Counter
+        
+        # 获取本月和上月的Job ID集合（只包含有Extraction的）
+        current_month_job_ids = {job.id for job in current_month_jobs}
+        last_month_job_ids = {job.id for job in last_month_jobs}
         
         for extraction, job in monthly_extractions_with_jobs:
             if not job:
@@ -534,14 +552,22 @@ def get_trends(
     # 保留此字段以保持API兼容性，但使用空字典
     keyword_growth = {}
     
+    # 计算提取覆盖率
+    extraction_coverage = {
+        "total_jobs_all": total_jobs_all,  # 所有Job数量（包括未提取的）
+        "total_jobs_with_extraction": total_jobs,  # 有Extraction的Job数量
+        "coverage_rate": round((total_jobs / total_jobs_all * 100) if total_jobs_all > 0 else 0, 2)  # 覆盖率百分比
+    }
+    
     result = {
-        "total_jobs": total_jobs,
+        "total_jobs": total_jobs,  # 只统计有Extraction的Job
         "count_by_role_family": dict(count_by_role_family),
         "count_by_seniority": dict(count_by_seniority),
         "top_keywords": top_keywords,
         "top_keywords_by_role_family": top_keywords_by_role_family,
         "keyword_growth": keyword_growth,
-        "monthly_comparison": monthly_comparison
+        "monthly_comparison": monthly_comparison,
+        "extraction_coverage": extraction_coverage  # 添加提取覆盖率信息
     }
     
     # 如果指定了role_family筛选，添加该角色族的top20关键词
