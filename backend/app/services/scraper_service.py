@@ -253,7 +253,7 @@ async def save_job_to_api_incremental(job_data: Dict[str, Any], source: str, ses
 
 
 async def scrape_nz_jobs_incremental(
-    max_per_keyword: int = 20, 
+    max_per_keyword: int = 50, 
     headless: bool = True, 
     browser: str = "firefox"
 ):
@@ -261,7 +261,7 @@ async def scrape_nz_jobs_incremental(
     增量抓取新西兰Seek上的IT职位
     
     Args:
-        max_per_keyword: 每个关键词最多抓取多少个职位（默认20，增加覆盖率）
+        max_per_keyword: 每个关键词最多抓取多少个职位（默认50，增加覆盖率）
         headless: 是否使用无头模式（默认True，后台运行）
         browser: 使用的浏览器 (chromium, firefox, webkit)
     """

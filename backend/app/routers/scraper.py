@@ -9,7 +9,7 @@ router = APIRouter(prefix="/scraper", tags=["scraper"])
 
 class ScrapeRequest(BaseModel):
     """抓取请求"""
-    max_per_keyword: int = Field(20, description="每个关键词最多抓取多少个职位", ge=1, le=50)
+    max_per_keyword: int = Field(50, description="每个关键词最多抓取多少个职位", ge=1, le=100)
     headless: bool = Field(True, description="是否使用无头模式（后台运行）")
     browser: str = Field("firefox", description="使用的浏览器", pattern="^(chromium|firefox|webkit)$")
 
