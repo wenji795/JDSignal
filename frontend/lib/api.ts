@@ -123,6 +123,52 @@ export interface CompanyAnalysisResponse {
   total_jobs: number;
 }
 
+export interface ExperienceAnalysisResponse {
+  experience_distribution: Array<{ range: string; count: number }>;
+  experience_by_role_family: Record<string, Record<string, number>>;
+  experience_trends: Array<{ week: string; average_years: number; count: number }>;
+  total_jobs: number;
+  jobs_with_experience: number;
+}
+
+export interface EducationAnalysisResponse {
+  degree_distribution: Array<{ degree: string; count: number }>;
+  degree_by_role_family: Record<string, Record<string, number>>;
+  certifications_distribution: Array<{ certification: string; count: number }>;
+  total_jobs: number;
+  jobs_with_degree: number;
+  jobs_with_certifications: number;
+}
+
+export interface IndustryAnalysisResponse {
+  industry_distribution: Array<{ industry: string; count: number }>;
+  industry_by_role_family: Record<string, Record<string, number>>;
+  industry_trends: Record<string, Array<{ week: string; count: number }>>;
+  total_jobs: number;
+}
+
+export interface SourceAnalysisResponse {
+  source_distribution: Array<{ source: string; count: number }>;
+  source_quality: Record<string, {
+    total_jobs: number;
+    extracted_jobs: number;
+    success_rate: number;
+  }>;
+  total_jobs: number;
+}
+
+export interface SkillCombinationAnalysisResponse {
+  skill_cooccurrence: Array<{ skill1: string; skill2: string; count: number }>;
+  must_have_vs_nice_to_have: Array<{
+    skill: string;
+    must_have_count: number;
+    nice_to_have_count: number;
+    total_count: number;
+  }>;
+  skill_intensity_by_role_family: Record<string, Array<{ skill: string; count: number }>>;
+  total_jobs: number;
+}
+
 /**
  * 获取所有职位
  */
@@ -394,6 +440,166 @@ export async function getCompanyAnalysis(params?: {
     
     if (!response.ok) {
       throw new Error(`Failed to fetch company analysis: ${response.status}`);
+    }
+    
+    return response.json();
+  } catch (error) {
+    throw error;
+  }
+}
+
+/**
+ * 获取经验要求分析
+ */
+export async function getExperienceAnalysis(params?: {
+  days?: number;
+  role_family?: string;
+  seniority?: string;
+  location?: string;
+}): Promise<ExperienceAnalysisResponse> {
+  const queryParams = new URLSearchParams();
+  if (params?.days) queryParams.append('days', params.days.toString());
+  if (params?.role_family) queryParams.append('role_family', params.role_family);
+  if (params?.seniority) queryParams.append('seniority', params.seniority);
+  if (params?.location) queryParams.append('location', params.location);
+  
+  const url = `${API_BASE_URL}/analytics/experience${queryParams.toString() ? `?${queryParams.toString()}` : ''}`;
+  
+  try {
+    const response = await fetch(url, {
+      headers: { 'Content-Type': 'application/json' },
+    });
+    
+    if (!response.ok) {
+      throw new Error(`Failed to fetch experience analysis: ${response.status}`);
+    }
+    
+    return response.json();
+  } catch (error) {
+    throw error;
+  }
+}
+
+/**
+ * 获取学历要求分析
+ */
+export async function getEducationAnalysis(params?: {
+  days?: number;
+  role_family?: string;
+  seniority?: string;
+  location?: string;
+}): Promise<EducationAnalysisResponse> {
+  const queryParams = new URLSearchParams();
+  if (params?.days) queryParams.append('days', params.days.toString());
+  if (params?.role_family) queryParams.append('role_family', params.role_family);
+  if (params?.seniority) queryParams.append('seniority', params.seniority);
+  if (params?.location) queryParams.append('location', params.location);
+  
+  const url = `${API_BASE_URL}/analytics/education${queryParams.toString() ? `?${queryParams.toString()}` : ''}`;
+  
+  try {
+    const response = await fetch(url, {
+      headers: { 'Content-Type': 'application/json' },
+    });
+    
+    if (!response.ok) {
+      throw new Error(`Failed to fetch education analysis: ${response.status}`);
+    }
+    
+    return response.json();
+  } catch (error) {
+    throw error;
+  }
+}
+
+/**
+ * 获取行业分析
+ */
+export async function getIndustryAnalysis(params?: {
+  days?: number;
+  role_family?: string;
+  seniority?: string;
+  location?: string;
+}): Promise<IndustryAnalysisResponse> {
+  const queryParams = new URLSearchParams();
+  if (params?.days) queryParams.append('days', params.days.toString());
+  if (params?.role_family) queryParams.append('role_family', params.role_family);
+  if (params?.seniority) queryParams.append('seniority', params.seniority);
+  if (params?.location) queryParams.append('location', params.location);
+  
+  const url = `${API_BASE_URL}/analytics/industry${queryParams.toString() ? `?${queryParams.toString()}` : ''}`;
+  
+  try {
+    const response = await fetch(url, {
+      headers: { 'Content-Type': 'application/json' },
+    });
+    
+    if (!response.ok) {
+      throw new Error(`Failed to fetch industry analysis: ${response.status}`);
+    }
+    
+    return response.json();
+  } catch (error) {
+    throw error;
+  }
+}
+
+/**
+ * 获取数据来源分析
+ */
+export async function getSourceAnalysis(params?: {
+  days?: number;
+  role_family?: string;
+  seniority?: string;
+  location?: string;
+}): Promise<SourceAnalysisResponse> {
+  const queryParams = new URLSearchParams();
+  if (params?.days) queryParams.append('days', params.days.toString());
+  if (params?.role_family) queryParams.append('role_family', params.role_family);
+  if (params?.seniority) queryParams.append('seniority', params.seniority);
+  if (params?.location) queryParams.append('location', params.location);
+  
+  const url = `${API_BASE_URL}/analytics/source${queryParams.toString() ? `?${queryParams.toString()}` : ''}`;
+  
+  try {
+    const response = await fetch(url, {
+      headers: { 'Content-Type': 'application/json' },
+    });
+    
+    if (!response.ok) {
+      throw new Error(`Failed to fetch source analysis: ${response.status}`);
+    }
+    
+    return response.json();
+  } catch (error) {
+    throw error;
+  }
+}
+
+/**
+ * 获取技能组合分析
+ */
+export async function getSkillCombinationAnalysis(params?: {
+  days?: number;
+  role_family?: string;
+  seniority?: string;
+  location?: string;
+}): Promise<SkillCombinationAnalysisResponse> {
+  const queryParams = new URLSearchParams();
+  if (params?.days) queryParams.append('days', params.days.toString());
+  if (params?.role_family) queryParams.append('role_family', params.role_family);
+  if (params?.seniority) queryParams.append('seniority', params.seniority);
+  if (params?.location) queryParams.append('location', params.location);
+  
+  const url = `${API_BASE_URL}/analytics/skill-combination${queryParams.toString() ? `?${queryParams.toString()}` : ''}`;
+  
+  try {
+    const response = await fetch(url, {
+      headers: { 'Content-Type': 'application/json' },
+    });
+    
+    if (!response.ok) {
+      throw new Error(`Failed to fetch skill combination analysis: ${response.status}`);
     }
     
     return response.json();

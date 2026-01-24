@@ -202,7 +202,7 @@ export default function TrendsPage() {
       <div className="bg-blue-50 border border-blue-200 rounded-lg p-6 mb-6">
         <div className="flex items-center justify-between">
           <div>
-            <div className="text-2xl font-bold text-blue-800">{trends.total_jobs}</div>
+        <div className="text-2xl font-bold text-blue-800">{trends.total_jobs}</div>
             <div className="text-blue-600">Total Jobs (with extraction)</div>
           </div>
           {trends.extraction_coverage && trends.extraction_coverage.total_jobs_all > trends.extraction_coverage.total_jobs_with_extraction && (

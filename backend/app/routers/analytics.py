@@ -1049,3 +1049,643 @@ def get_company_analysis(
         "company_role_family_preference": company_role_family_preference_dict,
         "total_jobs": len(jobs_with_extraction)
     }
+
+
+@router.get("/experience", response_model=Dict[str, Any])
+def get_experience_analysis(
+    days: int = Query(30, description="时间窗口（天数）"),
+    role_family: Optional[str] = Query(None, description="按角色族过滤"),
+    seniority: Optional[str] = Query(None, description="按资历级别过滤"),
+    location: Optional[str] = Query(None, description="按地点过滤"),
+    session: Session = Depends(get_session)
+):
+    """
+    获取经验要求分析
+    
+    返回：
+    - experience_distribution: 经验年限分布
+    - experience_by_role_family: 不同角色族的经验要求对比
+    - experience_trends: 经验要求随时间的变化趋势
+    """
+    # 计算时间窗口
+    end_date = datetime.utcnow()
+    start_date = end_date - timedelta(days=days)
+    
+    # 构建基础查询
+    job_query = select(Job).where(Job.captured_at >= start_date, Job.captured_at <= end_date)
+    
+    # 应用过滤条件
+    if role_family:
+        job_query = job_query.where(Job.role_family == role_family)
+    if seniority:
+        seniority_mapping = {
+            'graduate': Seniority.JUNIOR,
+            'junior': Seniority.JUNIOR,
+            'intermediate': Seniority.MID,
+            'mid': Seniority.MID,
+            'senior': Seniority.SENIOR
+        }
+        mapped_seniority = seniority_mapping.get(seniority.lower())
+        if mapped_seniority:
+            job_query = job_query.where(Job.seniority == mapped_seniority)
+        else:
+            try:
+                job_query = job_query.where(Job.seniority == Seniority(seniority.lower()))
+            except ValueError:
+                pass
+    if location:
+        job_query = job_query.where(Job.location.contains(location))
+    
+    jobs = session.exec(job_query).all()
+    job_ids = [job.id for job in jobs]
+    
+    # 只获取有Extraction的Job
+    if job_ids:
+        extraction_query = select(Extraction).where(Extraction.job_id.in_(job_ids))
+        extractions = session.exec(extraction_query).all()
+        extraction_job_ids = {ext.job_id for ext in extractions}
+        jobs_with_extraction = [job for job in jobs if job.id in extraction_job_ids]
+        # 创建job_id到extraction的映射
+        extraction_map = {ext.job_id: ext for ext in extractions}
+    else:
+        jobs_with_extraction = []
+        extraction_map = {}
+    
+    # 1. 经验年限分布
+    experience_counter = Counter()
+    for job in jobs_with_extraction:
+        extraction = extraction_map.get(job.id)
+        if extraction and extraction.years_required is not None:
+            # 将经验年限分组（0-2, 3-5, 6-8, 9-11, 12+）
+            years = extraction.years_required
+            if years <= 2:
+                bucket = "0-2 years"
+            elif years <= 5:
+                bucket = "3-5 years"
+            elif years <= 8:
+                bucket = "6-8 years"
+            elif years <= 11:
+                bucket = "9-11 years"
+            else:
+                bucket = "12+ years"
+            experience_counter[bucket] += 1
+    
+    experience_distribution = [
+        {"range": range_name, "count": count}
+        for range_name, count in sorted(experience_counter.items(), key=lambda x: {
+            "0-2 years": 0, "3-5 years": 1, "6-8 years": 2, "9-11 years": 3, "12+ years": 4
+        }.get(x[0], 5))
+    ]
+    
+    # 2. 不同角色族的经验要求对比
+    experience_by_role_family: Dict[str, Counter] = defaultdict(Counter)
+    for job in jobs_with_extraction:
+        extraction = extraction_map.get(job.id)
+        if job.role_family and extraction and extraction.years_required is not None:
+            years = extraction.years_required
+            if years <= 2:
+                bucket = "0-2 years"
+            elif years <= 5:
+                bucket = "3-5 years"
+            elif years <= 8:
+                bucket = "6-8 years"
+            elif years <= 11:
+                bucket = "9-11 years"
+            else:
+                bucket = "12+ years"
+            experience_by_role_family[job.role_family][bucket] += 1
+    
+    experience_by_role_family_dict = {}
+    for role_fam, counter in experience_by_role_family.items():
+        experience_by_role_family_dict[role_fam] = dict(counter)
+    
+    # 3. 经验要求随时间的变化趋势（按周统计，只统计平均经验要求）
+    experience_trends: Dict[str, List[int]] = defaultdict(list)
+    for job in jobs_with_extraction:
+        extraction = extraction_map.get(job.id)
+        if extraction and extraction.years_required is not None and job.posted_date:
+            days_since_monday = job.posted_date.weekday()
+            monday = job.posted_date - timedelta(days=days_since_monday)
+            week_key = monday.strftime("%Y-%m-%d")
+            experience_trends[week_key].append(extraction.years_required)
+    
+    # 计算每周的平均经验要求
+    experience_trends_list = []
+    for week, years_list in sorted(experience_trends.items()):
+        avg_years = sum(years_list) / len(years_list) if years_list else 0
+        experience_trends_list.append({
+            "week": week,
+            "average_years": round(avg_years, 1),
+            "count": len(years_list)
+        })
+    
+    return {
+        "experience_distribution": experience_distribution,
+        "experience_by_role_family": experience_by_role_family_dict,
+        "experience_trends": experience_trends_list,
+        "total_jobs": len(jobs_with_extraction),
+        "jobs_with_experience": sum(1 for job in jobs_with_extraction if extraction_map.get(job.id) and extraction_map[job.id].years_required is not None)
+    }
+
+
+@router.get("/education", response_model=Dict[str, Any])
+def get_education_analysis(
+    days: int = Query(30, description="时间窗口（天数）"),
+    role_family: Optional[str] = Query(None, description="按角色族过滤"),
+    seniority: Optional[str] = Query(None, description="按资历级别过滤"),
+    location: Optional[str] = Query(None, description="按地点过滤"),
+    session: Session = Depends(get_session)
+):
+    """
+    获取学历要求分析
+    
+    返回：
+    - degree_distribution: 学历要求分布
+    - degree_by_role_family: 不同角色族的学历要求对比
+    - certifications_distribution: 证书要求统计
+    """
+    # 计算时间窗口
+    end_date = datetime.utcnow()
+    start_date = end_date - timedelta(days=days)
+    
+    # 构建基础查询
+    job_query = select(Job).where(Job.captured_at >= start_date, Job.captured_at <= end_date)
+    
+    # 应用过滤条件
+    if role_family:
+        job_query = job_query.where(Job.role_family == role_family)
+    if seniority:
+        seniority_mapping = {
+            'graduate': Seniority.JUNIOR,
+            'junior': Seniority.JUNIOR,
+            'intermediate': Seniority.MID,
+            'mid': Seniority.MID,
+            'senior': Seniority.SENIOR
+        }
+        mapped_seniority = seniority_mapping.get(seniority.lower())
+        if mapped_seniority:
+            job_query = job_query.where(Job.seniority == mapped_seniority)
+        else:
+            try:
+                job_query = job_query.where(Job.seniority == Seniority(seniority.lower()))
+            except ValueError:
+                pass
+    if location:
+        job_query = job_query.where(Job.location.contains(location))
+    
+    jobs = session.exec(job_query).all()
+    job_ids = [job.id for job in jobs]
+    
+    # 只获取有Extraction的Job
+    if job_ids:
+        extraction_query = select(Extraction).where(Extraction.job_id.in_(job_ids))
+        extractions = session.exec(extraction_query).all()
+        extraction_job_ids = {ext.job_id for ext in extractions}
+        jobs_with_extraction = [job for job in jobs if job.id in extraction_job_ids]
+        extraction_map = {ext.job_id: ext for ext in extractions}
+    else:
+        jobs_with_extraction = []
+        extraction_map = {}
+    
+    # 1. 学历要求分布
+    degree_counter = Counter()
+    for job in jobs_with_extraction:
+        extraction = extraction_map.get(job.id)
+        if extraction and extraction.degree_required:
+            # 规范化学历名称
+            degree_lower = extraction.degree_required.lower()
+            if 'bachelor' in degree_lower or 'bs' in degree_lower or 'ba' in degree_lower:
+                degree = "Bachelor's"
+            elif 'master' in degree_lower or 'ms' in degree_lower or 'mba' in degree_lower:
+                degree = "Master's"
+            elif 'phd' in degree_lower or 'ph.d' in degree_lower or 'doctorate' in degree_lower:
+                degree = "PhD"
+            elif 'associate' in degree_lower:
+                degree = "Associate"
+            else:
+                degree = extraction.degree_required
+            degree_counter[degree] += 1
+    
+    degree_distribution = [
+        {"degree": degree, "count": count}
+        for degree, count in degree_counter.most_common()
+    ]
+    
+    # 2. 不同角色族的学历要求对比
+    degree_by_role_family: Dict[str, Counter] = defaultdict(Counter)
+    for job in jobs_with_extraction:
+        extraction = extraction_map.get(job.id)
+        if job.role_family and extraction and extraction.degree_required:
+            degree_lower = extraction.degree_required.lower()
+            if 'bachelor' in degree_lower or 'bs' in degree_lower or 'ba' in degree_lower:
+                degree = "Bachelor's"
+            elif 'master' in degree_lower or 'ms' in degree_lower or 'mba' in degree_lower:
+                degree = "Master's"
+            elif 'phd' in degree_lower or 'ph.d' in degree_lower or 'doctorate' in degree_lower:
+                degree = "PhD"
+            elif 'associate' in degree_lower:
+                degree = "Associate"
+            else:
+                degree = extraction.degree_required
+            degree_by_role_family[job.role_family][degree] += 1
+    
+    degree_by_role_family_dict = {}
+    for role_fam, counter in degree_by_role_family.items():
+        degree_by_role_family_dict[role_fam] = dict(counter)
+    
+    # 3. 证书要求统计
+    certification_counter = Counter()
+    for job in jobs_with_extraction:
+        extraction = extraction_map.get(job.id)
+        if extraction and extraction.certifications_json:
+            certs = extraction.certifications_json.get("certifications", [])
+            for cert in certs:
+                if isinstance(cert, str):
+                    certification_counter[cert] += 1
+    
+    certifications_distribution = [
+        {"certification": cert, "count": count}
+        for cert, count in certification_counter.most_common(20)
+    ]
+    
+    return {
+        "degree_distribution": degree_distribution,
+        "degree_by_role_family": degree_by_role_family_dict,
+        "certifications_distribution": certifications_distribution,
+        "total_jobs": len(jobs_with_extraction),
+        "jobs_with_degree": sum(1 for job in jobs_with_extraction if extraction_map.get(job.id) and extraction_map[job.id].degree_required),
+        "jobs_with_certifications": sum(1 for job in jobs_with_extraction if extraction_map.get(job.id) and extraction_map[job.id].certifications_json.get("certifications"))
+    }
+
+
+@router.get("/industry", response_model=Dict[str, Any])
+def get_industry_analysis(
+    days: int = Query(30, description="时间窗口（天数）"),
+    role_family: Optional[str] = Query(None, description="按角色族过滤"),
+    seniority: Optional[str] = Query(None, description="按资历级别过滤"),
+    location: Optional[str] = Query(None, description="按地点过滤"),
+    session: Session = Depends(get_session)
+):
+    """
+    获取行业分析
+    
+    返回：
+    - industry_distribution: 行业分布
+    - industry_by_role_family: 不同行业的角色族分布
+    - industry_trends: 行业招聘趋势
+    """
+    # 计算时间窗口
+    end_date = datetime.utcnow()
+    start_date = end_date - timedelta(days=days)
+    
+    # 构建基础查询
+    job_query = select(Job).where(Job.captured_at >= start_date, Job.captured_at <= end_date)
+    
+    # 应用过滤条件
+    if role_family:
+        job_query = job_query.where(Job.role_family == role_family)
+    if seniority:
+        seniority_mapping = {
+            'graduate': Seniority.JUNIOR,
+            'junior': Seniority.JUNIOR,
+            'intermediate': Seniority.MID,
+            'mid': Seniority.MID,
+            'senior': Seniority.SENIOR
+        }
+        mapped_seniority = seniority_mapping.get(seniority.lower())
+        if mapped_seniority:
+            job_query = job_query.where(Job.seniority == mapped_seniority)
+        else:
+            try:
+                job_query = job_query.where(Job.seniority == Seniority(seniority.lower()))
+            except ValueError:
+                pass
+    if location:
+        job_query = job_query.where(Job.location.contains(location))
+    
+    jobs = session.exec(job_query).all()
+    job_ids = [job.id for job in jobs]
+    
+    # 只获取有Extraction的Job
+    if job_ids:
+        extraction_query = select(Extraction).where(Extraction.job_id.in_(job_ids))
+        extractions = session.exec(extraction_query).all()
+        extraction_job_ids = {ext.job_id for ext in extractions}
+        jobs_with_extraction = [job for job in jobs if job.id in extraction_job_ids]
+    else:
+        jobs_with_extraction = []
+    
+    # 1. 行业分布
+    industry_counter = Counter()
+    for job in jobs_with_extraction:
+        if job.industry:
+            industry_counter[job.industry] += 1
+    
+    industry_distribution = [
+        {"industry": industry, "count": count}
+        for industry, count in industry_counter.most_common(20)
+    ]
+    
+    # 2. 不同行业的角色族分布
+    industry_by_role_family: Dict[str, Dict[str, int]] = defaultdict(lambda: defaultdict(int))
+    for job in jobs_with_extraction:
+        if job.industry and job.role_family:
+            industry_by_role_family[job.industry][job.role_family] += 1
+    
+    industry_by_role_family_dict = {}
+    for industry, role_families in industry_by_role_family.items():
+        industry_by_role_family_dict[industry] = dict(role_families)
+    
+    # 3. 行业招聘趋势（按周统计）
+    industry_trends: Dict[str, Dict[str, int]] = defaultdict(lambda: defaultdict(int))
+    for job in jobs_with_extraction:
+        if job.industry and job.posted_date:
+            days_since_monday = job.posted_date.weekday()
+            monday = job.posted_date - timedelta(days=days_since_monday)
+            week_key = monday.strftime("%Y-%m-%d")
+            industry_trends[job.industry][week_key] += 1
+    
+    # 转换为列表格式（只保留Top 10行业）
+    top_10_industries = [item["industry"] for item in industry_distribution[:10]]
+    industry_trends_dict = {}
+    for industry in top_10_industries:
+        if industry in industry_trends:
+            industry_trends_dict[industry] = [
+                {"week": week, "count": count}
+                for week, count in sorted(industry_trends[industry].items())
+            ]
+    
+    return {
+        "industry_distribution": industry_distribution,
+        "industry_by_role_family": industry_by_role_family_dict,
+        "industry_trends": industry_trends_dict,
+        "total_jobs": len(jobs_with_extraction)
+    }
+
+
+@router.get("/source", response_model=Dict[str, Any])
+def get_source_analysis(
+    days: int = Query(30, description="时间窗口（天数）"),
+    role_family: Optional[str] = Query(None, description="按角色族过滤"),
+    seniority: Optional[str] = Query(None, description="按资历级别过滤"),
+    location: Optional[str] = Query(None, description="按地点过滤"),
+    session: Session = Depends(get_session)
+):
+    """
+    获取数据来源分析
+    
+    返回：
+    - source_distribution: 数据来源分布
+    - source_quality: 不同来源的职位质量对比（提取成功率）
+    """
+    # 计算时间窗口
+    end_date = datetime.utcnow()
+    start_date = end_date - timedelta(days=days)
+    
+    # 构建基础查询
+    job_query = select(Job).where(Job.captured_at >= start_date, Job.captured_at <= end_date)
+    
+    # 应用过滤条件
+    if role_family:
+        job_query = job_query.where(Job.role_family == role_family)
+    if seniority:
+        seniority_mapping = {
+            'graduate': Seniority.JUNIOR,
+            'junior': Seniority.JUNIOR,
+            'intermediate': Seniority.MID,
+            'mid': Seniority.MID,
+            'senior': Seniority.SENIOR
+        }
+        mapped_seniority = seniority_mapping.get(seniority.lower())
+        if mapped_seniority:
+            job_query = job_query.where(Job.seniority == mapped_seniority)
+        else:
+            try:
+                job_query = job_query.where(Job.seniority == Seniority(seniority.lower()))
+            except ValueError:
+                pass
+    if location:
+        job_query = job_query.where(Job.location.contains(location))
+    
+    jobs = session.exec(job_query).all()
+    job_ids = [job.id for job in jobs]
+    
+    # 获取所有Extraction
+    if job_ids:
+        extraction_query = select(Extraction).where(Extraction.job_id.in_(job_ids))
+        extractions = session.exec(extraction_query).all()
+        extraction_job_ids = {ext.job_id for ext in extractions}
+    else:
+        extractions = []
+        extraction_job_ids = set()
+    
+    # 1. 数据来源分布
+    source_counter = Counter()
+    for job in jobs:
+        source_counter[job.source] += 1
+    
+    source_distribution = [
+        {"source": source, "count": count}
+        for source, count in source_counter.most_common()
+    ]
+    
+    # 2. 不同来源的提取成功率
+    source_quality = {}
+    for source, total_count in source_counter.items():
+        source_jobs = [job for job in jobs if job.source == source]
+        source_job_ids = {job.id for job in source_jobs}
+        extracted_count = len(source_job_ids & extraction_job_ids)
+        success_rate = (extracted_count / total_count * 100) if total_count > 0 else 0
+        
+        source_quality[source] = {
+            "total_jobs": total_count,
+            "extracted_jobs": extracted_count,
+            "success_rate": round(success_rate, 2)
+        }
+    
+    return {
+        "source_distribution": source_distribution,
+        "source_quality": source_quality,
+        "total_jobs": len(jobs)
+    }
+
+
+@router.get("/skill-combination", response_model=Dict[str, Any])
+def get_skill_combination_analysis(
+    days: int = Query(30, description="时间窗口（天数）"),
+    role_family: Optional[str] = Query(None, description="按角色族过滤"),
+    seniority: Optional[str] = Query(None, description="按资历级别过滤"),
+    location: Optional[str] = Query(None, description="按地点过滤"),
+    session: Session = Depends(get_session)
+):
+    """
+    获取技能组合分析
+    
+    返回：
+    - skill_cooccurrence: 技能共现分析（Top 20 技能组合）
+    - must_have_vs_nice_to_have: Must-have vs Nice-to-have 对比
+    - skill_intensity_by_role_family: 按角色族统计技能出现频率（Top 10技能）
+    """
+    # 计算时间窗口
+    end_date = datetime.utcnow()
+    start_date = end_date - timedelta(days=days)
+    
+    # 构建基础查询
+    job_query = select(Job).where(Job.captured_at >= start_date, Job.captured_at <= end_date)
+    
+    # 应用过滤条件
+    if role_family:
+        job_query = job_query.where(Job.role_family == role_family)
+    if seniority:
+        seniority_mapping = {
+            'graduate': Seniority.JUNIOR,
+            'junior': Seniority.JUNIOR,
+            'intermediate': Seniority.MID,
+            'mid': Seniority.MID,
+            'senior': Seniority.SENIOR
+        }
+        mapped_seniority = seniority_mapping.get(seniority.lower())
+        if mapped_seniority:
+            job_query = job_query.where(Job.seniority == mapped_seniority)
+        else:
+            try:
+                job_query = job_query.where(Job.seniority == Seniority(seniority.lower()))
+            except ValueError:
+                pass
+    if location:
+        job_query = job_query.where(Job.location.contains(location))
+    
+    jobs = session.exec(job_query).all()
+    job_ids = [job.id for job in jobs]
+    
+    # 只获取有Extraction的Job
+    if job_ids:
+        extraction_query = select(Extraction).where(Extraction.job_id.in_(job_ids))
+        extractions = session.exec(extraction_query).all()
+        extraction_job_ids = {ext.job_id for ext in extractions}
+        jobs_with_extraction = [job for job in jobs if job.id in extraction_job_ids]
+        extraction_map = {ext.job_id: ext for ext in extractions}
+    else:
+        jobs_with_extraction = []
+        extraction_map = {}
+    
+    # 1. 技能共现分析
+    skill_cooccurrence_counter = Counter()
+    skill_sets = []  # 存储每个职位的技能集合
+    
+    for job in jobs_with_extraction:
+        extraction = extraction_map.get(job.id)
+        if not extraction:
+            continue
+        
+        # 获取所有技能（从keywords_json）
+        keywords_data = extraction.keywords_json.get("keywords", [])
+        skills_in_job = set()
+        
+        for kw in keywords_data:
+            if isinstance(kw, dict):
+                term = kw.get("term", "")
+            elif isinstance(kw, str):
+                term = kw
+            else:
+                continue
+            
+            if term and not should_filter_keyword(term):
+                normalized_term = normalize_keyword(term)
+                term_upper = normalized_term.upper().strip()
+                if term_upper == 'CI/CD' or term_upper == 'CI CD':
+                    normalized_term = 'CI/CD'
+                skills_in_job.add(normalized_term)
+        
+        if len(skills_in_job) > 1:
+            skill_sets.append(skills_in_job)
+            # 计算所有技能对
+            skills_list = sorted(list(skills_in_job))
+            for i in range(len(skills_list)):
+                for j in range(i + 1, len(skills_list)):
+                    pair = tuple(sorted([skills_list[i], skills_list[j]]))
+                    skill_cooccurrence_counter[pair] += 1
+    
+    # 处理CI/CD合并
+    if 'CI' in skill_cooccurrence_counter or 'CD' in skill_cooccurrence_counter:
+        # 需要重新计算包含CI/CD的组合
+        pass  # 这里简化处理，实际应该合并CI和CD
+    
+    skill_cooccurrence = [
+        {"skill1": pair[0], "skill2": pair[1], "count": count}
+        for pair, count in skill_cooccurrence_counter.most_common(20)
+    ]
+    
+    # 2. Must-have vs Nice-to-have 对比
+    must_have_counter = Counter()
+    nice_to_have_counter = Counter()
+    
+    for job in jobs_with_extraction:
+        extraction = extraction_map.get(job.id)
+        if not extraction:
+            continue
+        
+        # Must-have 技能
+        must_have_skills = extraction.must_have_json.get("keywords", [])
+        for skill in must_have_skills:
+            if isinstance(skill, str) and skill and not should_filter_keyword(skill):
+                normalized = normalize_keyword(skill)
+                must_have_counter[normalized] += 1
+        
+        # Nice-to-have 技能
+        nice_to_have_skills = extraction.nice_to_have_json.get("keywords", [])
+        for skill in nice_to_have_skills:
+            if isinstance(skill, str) and skill and not should_filter_keyword(skill):
+                normalized = normalize_keyword(skill)
+                nice_to_have_counter[normalized] += 1
+    
+    # 合并统计
+    all_skills = set(must_have_counter.keys()) | set(nice_to_have_counter.keys())
+    must_have_vs_nice_to_have = []
+    for skill in sorted(all_skills, key=lambda s: must_have_counter.get(s, 0) + nice_to_have_counter.get(s, 0), reverse=True)[:30]:
+        must_have_vs_nice_to_have.append({
+            "skill": skill,
+            "must_have_count": must_have_counter.get(skill, 0),
+            "nice_to_have_count": nice_to_have_counter.get(skill, 0),
+            "total_count": must_have_counter.get(skill, 0) + nice_to_have_counter.get(skill, 0)
+        })
+    
+    # 3. 按角色族统计技能出现频率
+    skill_intensity_by_role_family: Dict[str, Counter] = defaultdict(Counter)
+    
+    for job in jobs_with_extraction:
+        extraction = extraction_map.get(job.id)
+        if not job.role_family or not extraction:
+            continue
+        
+        keywords_data = extraction.keywords_json.get("keywords", [])
+        for kw in keywords_data:
+            if isinstance(kw, dict):
+                term = kw.get("term", "")
+            elif isinstance(kw, str):
+                term = kw
+            else:
+                continue
+            
+            if term and not should_filter_keyword(term):
+                normalized_term = normalize_keyword(term)
+                term_upper = normalized_term.upper().strip()
+                if term_upper == 'CI/CD' or term_upper == 'CI CD':
+                    normalized_term = 'CI/CD'
+                skill_intensity_by_role_family[job.role_family][normalized_term] += 1
+    
+    # 转换为前端需要的格式（每个角色族Top 10技能）
+    skill_intensity_dict = {}
+    for role_fam, counter in skill_intensity_by_role_family.items():
+        top_skills = counter.most_common(10)
+        skill_intensity_dict[role_fam] = [
+            {"skill": skill, "count": count}
+            for skill, count in top_skills
+        ]
+    
+    return {
+        "skill_cooccurrence": skill_cooccurrence,
+        "must_have_vs_nice_to_have": must_have_vs_nice_to_have,
+        "skill_intensity_by_role_family": skill_intensity_dict,
+        "total_jobs": len(jobs_with_extraction)
+    }
