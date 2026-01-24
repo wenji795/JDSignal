@@ -92,6 +92,37 @@ export interface TrendsResponse {
   };
 }
 
+export interface TimeTrendsResponse {
+  granularity: 'day' | 'week' | 'month';
+  time_range: {
+    start: string;
+    end: string;
+    days: number;
+  };
+  job_count_trend: Array<{ date: string; count: number }>;
+  role_family_trends: Record<string, Array<{ date: string; count: number }>>;
+  keyword_trends: Record<string, Array<{ date: string; count: number }>>;
+  activity_summary: {
+    weekly: Array<{ week: string; count: number }>;
+    monthly: Array<{ month: string; count: number }>;
+  };
+  total_jobs: number;
+}
+
+export interface LocationAnalysisResponse {
+  location_distribution: Array<{ location: string; count: number }>;
+  location_by_role_family: Record<string, Record<string, number>>;
+  location_trends: Record<string, Array<{ week: string; count: number }>>;
+  total_jobs: number;
+}
+
+export interface CompanyAnalysisResponse {
+  top_companies: Array<{ company: string; count: number }>;
+  company_trends: Record<string, Array<{ week: string; count: number }>>;
+  company_role_family_preference: Record<string, Record<string, number>>;
+  total_jobs: number;
+}
+
 /**
  * 获取所有职位
  */
@@ -254,6 +285,119 @@ export async function getTrends(params?: {
     if (error instanceof TypeError && error.message.includes('fetch')) {
       throw new Error('无法连接到后端API，请确保后端服务正在运行 (http://127.0.0.1:8000)');
     }
+    throw error;
+  }
+}
+
+/**
+ * 获取时间趋势分析
+ */
+export async function getTimeTrends(params?: {
+  days?: number;
+  granularity?: 'day' | 'week' | 'month';
+  role_family?: string;
+  seniority?: string;
+  location?: string;
+}): Promise<TimeTrendsResponse> {
+  const queryParams = new URLSearchParams();
+  if (params?.days) queryParams.append('days', params.days.toString());
+  if (params?.granularity) queryParams.append('granularity', params.granularity);
+  if (params?.role_family) queryParams.append('role_family', params.role_family);
+  if (params?.seniority) queryParams.append('seniority', params.seniority);
+  if (params?.location) queryParams.append('location', params.location);
+  
+  const url = `${API_BASE_URL}/analytics/time-trends${queryParams.toString() ? `?${queryParams.toString()}` : ''}`;
+  
+  try {
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 30000); // 30秒超时
+    
+    const response = await fetch(url, {
+      signal: controller.signal,
+      headers: {
+        'Content-Type': 'application/json',
+      },
+    });
+    
+    clearTimeout(timeoutId);
+    
+    if (!response.ok) {
+      const errorText = await response.text();
+      throw new Error(`Failed to fetch time trends: ${response.status} ${response.statusText} - ${errorText}`);
+    }
+    
+    return response.json();
+  } catch (error) {
+    if (error instanceof Error && error.name === 'AbortError') {
+      throw new Error('请求超时，请检查后端服务是否运行在 http://127.0.0.1:8000');
+    }
+    if (error instanceof TypeError && error.message.includes('fetch')) {
+      throw new Error('无法连接到后端API，请确保后端服务正在运行 (http://127.0.0.1:8000)');
+    }
+    throw error;
+  }
+}
+
+/**
+ * 获取地理位置分析
+ */
+export async function getLocationAnalysis(params?: {
+  days?: number;
+  role_family?: string;
+  seniority?: string;
+  location?: string;
+}): Promise<LocationAnalysisResponse> {
+  const queryParams = new URLSearchParams();
+  if (params?.days) queryParams.append('days', params.days.toString());
+  if (params?.role_family) queryParams.append('role_family', params.role_family);
+  if (params?.seniority) queryParams.append('seniority', params.seniority);
+  if (params?.location) queryParams.append('location', params.location);
+  
+  const url = `${API_BASE_URL}/analytics/location${queryParams.toString() ? `?${queryParams.toString()}` : ''}`;
+  
+  try {
+    const response = await fetch(url, {
+      headers: { 'Content-Type': 'application/json' },
+    });
+    
+    if (!response.ok) {
+      throw new Error(`Failed to fetch location analysis: ${response.status}`);
+    }
+    
+    return response.json();
+  } catch (error) {
+    throw error;
+  }
+}
+
+/**
+ * 获取公司分析
+ */
+export async function getCompanyAnalysis(params?: {
+  days?: number;
+  role_family?: string;
+  seniority?: string;
+  location?: string;
+}): Promise<CompanyAnalysisResponse> {
+  const queryParams = new URLSearchParams();
+  if (params?.days) queryParams.append('days', params.days.toString());
+  if (params?.role_family) queryParams.append('role_family', params.role_family);
+  if (params?.seniority) queryParams.append('seniority', params.seniority);
+  if (params?.location) queryParams.append('location', params.location);
+  
+  const url = `${API_BASE_URL}/analytics/company${queryParams.toString() ? `?${queryParams.toString()}` : ''}`;
+  
+  try {
+    const response = await fetch(url, {
+      headers: { 'Content-Type': 'application/json' },
+    });
+    
+    if (!response.ok) {
+      throw new Error(`Failed to fetch company analysis: ${response.status}`);
+    }
+    
+    return response.json();
+  } catch (error) {
     throw error;
   }
 }

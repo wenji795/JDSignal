@@ -2,7 +2,7 @@
 from fastapi import APIRouter, Depends, Query
 from sqlmodel import Session, select, func, and_, or_
 from typing import Dict, Any, Optional
-from collections import Counter
+from collections import Counter, defaultdict
 from datetime import datetime, timedelta
 import re
 
@@ -575,3 +575,477 @@ def get_trends(
         result["selected_role_family_top_keywords"] = selected_role_family_top_keywords
     
     return result
+
+
+@router.get("/time-trends", response_model=Dict[str, Any])
+def get_time_trends(
+    days: int = Query(90, description="时间窗口（天数）"),
+    granularity: str = Query("day", description="时间粒度：day/week/month"),
+    role_family: Optional[str] = Query(None, description="按角色族过滤"),
+    seniority: Optional[str] = Query(None, description="按资历级别过滤"),
+    location: Optional[str] = Query(None, description="按地点过滤"),
+    session: Session = Depends(get_session)
+):
+    """
+    获取时间趋势分析（基于posted_date）
+    
+    返回：
+    - job_count_trend: 职位数量随时间变化
+    - role_family_trends: 不同角色族的职位数量趋势
+    - keyword_trends: Top 10关键词热度趋势
+    - activity_summary: 招聘活跃度统计（按周/月）
+    """
+    
+    # 验证granularity参数
+    if granularity not in ["day", "week", "month"]:
+        granularity = "day"
+    
+    # 计算时间窗口
+    end_date = datetime.utcnow()
+    start_date = end_date - timedelta(days=days)
+    
+    # 构建基础查询 - 只查询有Extraction的Job，并且posted_date不为空
+    job_query = select(Job).where(
+        Job.posted_date.isnot(None),
+        Job.posted_date >= start_date,
+        Job.posted_date <= end_date
+    )
+    
+    # 应用过滤条件
+    if role_family:
+        job_query = job_query.where(Job.role_family == role_family)
+    if seniority:
+        seniority_mapping = {
+            'graduate': Seniority.JUNIOR,
+            'junior': Seniority.JUNIOR,
+            'intermediate': Seniority.MID,
+            'mid': Seniority.MID,
+            'senior': Seniority.SENIOR
+        }
+        mapped_seniority = seniority_mapping.get(seniority.lower())
+        if mapped_seniority:
+            job_query = job_query.where(Job.seniority == mapped_seniority)
+        else:
+            try:
+                job_query = job_query.where(Job.seniority == Seniority(seniority.lower()))
+            except ValueError:
+                pass
+    if location:
+        job_query = job_query.where(Job.location.contains(location))
+    
+    jobs = session.exec(job_query).all()
+    job_ids = [job.id for job in jobs]
+    
+    # 只获取有Extraction的Job
+    if job_ids:
+        extraction_query = select(Extraction).where(Extraction.job_id.in_(job_ids))
+        extractions = session.exec(extraction_query).all()
+        extraction_job_ids = {ext.job_id for ext in extractions}
+        jobs_with_extraction = [job for job in jobs if job.id in extraction_job_ids]
+    else:
+        jobs_with_extraction = []
+    
+    # 创建job_id到job的映射
+    job_map = {job.id: job for job in jobs_with_extraction}
+    
+    # 1. 职位数量随时间变化
+    time_buckets = defaultdict(int)
+    
+    for job in jobs_with_extraction:
+        if not job.posted_date:
+            continue
+        
+        posted_date = job.posted_date
+        
+        # 根据granularity分组
+        if granularity == "day":
+            bucket_key = posted_date.strftime("%Y-%m-%d")
+        elif granularity == "week":
+            # 获取该周的周一日期
+            days_since_monday = posted_date.weekday()
+            monday = posted_date - timedelta(days=days_since_monday)
+            bucket_key = monday.strftime("%Y-%m-%d")
+        else:  # month
+            bucket_key = posted_date.strftime("%Y-%m")
+        
+        time_buckets[bucket_key] += 1
+    
+    # 转换为列表并排序
+    job_count_trend = [
+        {"date": date, "count": count}
+        for date, count in sorted(time_buckets.items())
+    ]
+    
+    # 2. 不同角色族的职位数量趋势
+    role_family_trends = defaultdict(lambda: defaultdict(int))
+    
+    for job in jobs_with_extraction:
+        if not job.posted_date or not job.role_family:
+            continue
+        
+        posted_date = job.posted_date
+        
+        # 根据granularity分组
+        if granularity == "day":
+            bucket_key = posted_date.strftime("%Y-%m-%d")
+        elif granularity == "week":
+            days_since_monday = posted_date.weekday()
+            monday = posted_date - timedelta(days=days_since_monday)
+            bucket_key = monday.strftime("%Y-%m-%d")
+        else:  # month
+            bucket_key = posted_date.strftime("%Y-%m")
+        
+        role_family_trends[job.role_family][bucket_key] += 1
+    
+    # 转换为字典格式
+    role_family_trends_dict = {}
+    for role_fam, buckets in role_family_trends.items():
+        role_family_trends_dict[role_fam] = [
+            {"date": date, "count": count}
+            for date, count in sorted(buckets.items())
+        ]
+    
+    # 3. Top 10关键词热度趋势
+    # 先获取Top 10关键词
+    keyword_counter = Counter()
+    keyword_jobs_map = defaultdict(list)  # keyword -> list of jobs
+    
+    for extraction in extractions:
+        if extraction.job_id not in job_map:
+            continue
+        job = job_map[extraction.job_id]
+        if not job.posted_date:
+            continue
+        
+        keywords_data = extraction.keywords_json.get("keywords", [])
+        for kw in keywords_data:
+            if isinstance(kw, dict):
+                term = kw.get("term", "")
+            elif isinstance(kw, str):
+                term = kw
+            else:
+                continue
+            
+            if term and not should_filter_keyword(term):
+                normalized_term = normalize_keyword(term)
+                term_upper = normalized_term.upper().strip()
+                if term_upper == 'CI/CD' or term_upper == 'CI CD':
+                    normalized_term = 'CI/CD'
+                
+                keyword_counter[normalized_term] += 1
+                keyword_jobs_map[normalized_term].append(job)
+    
+    # 处理CI/CD合并
+    if 'CI' in keyword_counter and 'CD' in keyword_counter:
+        ci_count = keyword_counter['CI']
+        cd_count = keyword_counter['CD']
+        combined_count = ci_count + cd_count
+        if 'CI/CD' in keyword_counter:
+            combined_count += keyword_counter['CI/CD']
+        keyword_counter['CI/CD'] = combined_count
+        # 合并job列表
+        if 'CI/CD' not in keyword_jobs_map:
+            keyword_jobs_map['CI/CD'] = []
+        keyword_jobs_map['CI/CD'].extend(keyword_jobs_map.get('CI', []))
+        keyword_jobs_map['CI/CD'].extend(keyword_jobs_map.get('CD', []))
+        del keyword_counter['CI']
+        del keyword_counter['CD']
+        if 'CI' in keyword_jobs_map:
+            del keyword_jobs_map['CI']
+        if 'CD' in keyword_jobs_map:
+            del keyword_jobs_map['CD']
+    
+    # 获取Top 10关键词
+    top_10_keywords = [term for term, _ in keyword_counter.most_common(10)]
+    
+    # 计算每个关键词的时间趋势
+    keyword_trends = {}
+    for keyword in top_10_keywords:
+        keyword_buckets = defaultdict(int)
+        for job in keyword_jobs_map.get(keyword, []):
+            if not job.posted_date:
+                continue
+            
+            posted_date = job.posted_date
+            
+            if granularity == "day":
+                bucket_key = posted_date.strftime("%Y-%m-%d")
+            elif granularity == "week":
+                days_since_monday = posted_date.weekday()
+                monday = posted_date - timedelta(days=days_since_monday)
+                bucket_key = monday.strftime("%Y-%m-%d")
+            else:  # month
+                bucket_key = posted_date.strftime("%Y-%m")
+            
+            keyword_buckets[bucket_key] += 1
+        
+        keyword_trends[keyword] = [
+            {"date": date, "count": count}
+            for date, count in sorted(keyword_buckets.items())
+        ]
+    
+    # 4. 招聘活跃度统计（按周/月）
+    activity_summary = {}
+    
+    # 按周统计
+    weekly_activity = defaultdict(int)
+    for job in jobs_with_extraction:
+        if not job.posted_date:
+            continue
+        posted_date = job.posted_date
+        days_since_monday = posted_date.weekday()
+        monday = posted_date - timedelta(days=days_since_monday)
+        week_key = monday.strftime("%Y-%m-%d")
+        weekly_activity[week_key] += 1
+    
+    activity_summary["weekly"] = [
+        {"week": week, "count": count}
+        for week, count in sorted(weekly_activity.items())
+    ]
+    
+    # 按月统计
+    monthly_activity = defaultdict(int)
+    for job in jobs_with_extraction:
+        if not job.posted_date:
+            continue
+        month_key = job.posted_date.strftime("%Y-%m")
+        monthly_activity[month_key] += 1
+    
+    activity_summary["monthly"] = [
+        {"month": month, "count": count}
+        for month, count in sorted(monthly_activity.items())
+    ]
+    
+    return {
+        "granularity": granularity,
+        "time_range": {
+            "start": start_date.isoformat(),
+            "end": end_date.isoformat(),
+            "days": days
+        },
+        "job_count_trend": job_count_trend,
+        "role_family_trends": role_family_trends_dict,
+        "keyword_trends": keyword_trends,
+        "activity_summary": activity_summary,
+        "total_jobs": len(jobs_with_extraction)
+    }
+
+
+@router.get("/location", response_model=Dict[str, Any])
+def get_location_analysis(
+    days: int = Query(30, description="时间窗口（天数）"),
+    role_family: Optional[str] = Query(None, description="按角色族过滤"),
+    seniority: Optional[str] = Query(None, description="按资历级别过滤"),
+    location: Optional[str] = Query(None, description="按地点过滤"),
+    session: Session = Depends(get_session)
+):
+    """
+    获取地理位置分析
+    
+    返回：
+    - location_distribution: 按城市/地区统计职位分布
+    - location_by_role_family: 不同城市的角色族分布
+    - location_trends: 城市职位需求趋势
+    """
+    # 计算时间窗口
+    end_date = datetime.utcnow()
+    start_date = end_date - timedelta(days=days)
+    
+    # 构建基础查询
+    job_query = select(Job).where(Job.captured_at >= start_date, Job.captured_at <= end_date)
+    
+    # 应用过滤条件
+    if role_family:
+        job_query = job_query.where(Job.role_family == role_family)
+    if seniority:
+        seniority_mapping = {
+            'graduate': Seniority.JUNIOR,
+            'junior': Seniority.JUNIOR,
+            'intermediate': Seniority.MID,
+            'mid': Seniority.MID,
+            'senior': Seniority.SENIOR
+        }
+        mapped_seniority = seniority_mapping.get(seniority.lower())
+        if mapped_seniority:
+            job_query = job_query.where(Job.seniority == mapped_seniority)
+        else:
+            try:
+                job_query = job_query.where(Job.seniority == Seniority(seniority.lower()))
+            except ValueError:
+                pass
+    if location:
+        job_query = job_query.where(Job.location.contains(location))
+    
+    jobs = session.exec(job_query).all()
+    job_ids = [job.id for job in jobs]
+    
+    # 只获取有Extraction的Job
+    if job_ids:
+        extraction_query = select(Extraction).where(Extraction.job_id.in_(job_ids))
+        extractions = session.exec(extraction_query).all()
+        extraction_job_ids = {ext.job_id for ext in extractions}
+        jobs_with_extraction = [job for job in jobs if job.id in extraction_job_ids]
+    else:
+        jobs_with_extraction = []
+    
+    # 1. 按城市/地区统计职位分布
+    location_counter = Counter()
+    for job in jobs_with_extraction:
+        if job.location:
+            # 提取主要城市名称（处理 "Auckland, New Zealand" -> "Auckland"）
+            location_parts = job.location.split(',')
+            city = location_parts[0].strip() if location_parts else job.location.strip()
+            location_counter[city] += 1
+    
+    location_distribution = [
+        {"location": loc, "count": count}
+        for loc, count in location_counter.most_common(20)
+    ]
+    
+    # 2. 不同城市的角色族分布
+    location_by_role_family: Dict[str, Dict[str, int]] = defaultdict(lambda: defaultdict(int))
+    for job in jobs_with_extraction:
+        if job.location and job.role_family:
+            location_parts = job.location.split(',')
+            city = location_parts[0].strip() if location_parts else job.location.strip()
+            location_by_role_family[city][job.role_family] += 1
+    
+    # 转换为前端需要的格式
+    location_by_role_family_dict = {}
+    for city, role_families in location_by_role_family.items():
+        location_by_role_family_dict[city] = dict(role_families)
+    
+    # 3. 城市职位需求趋势（按周统计）
+    location_trends: Dict[str, List[Dict[str, Any]]] = defaultdict(lambda: defaultdict(int))
+    for job in jobs_with_extraction:
+        if job.location and job.posted_date:
+            location_parts = job.location.split(',')
+            city = location_parts[0].strip() if location_parts else job.location.strip()
+            # 获取该周的周一日期
+            days_since_monday = job.posted_date.weekday()
+            monday = job.posted_date - timedelta(days=days_since_monday)
+            week_key = monday.strftime("%Y-%m-%d")
+            location_trends[city][week_key] += 1
+    
+    # 转换为列表格式
+    location_trends_dict = {}
+    for city, weeks in location_trends.items():
+        location_trends_dict[city] = [
+            {"week": week, "count": count}
+            for week, count in sorted(weeks.items())
+        ]
+    
+    return {
+        "location_distribution": location_distribution,
+        "location_by_role_family": location_by_role_family_dict,
+        "location_trends": location_trends_dict,
+        "total_jobs": len(jobs_with_extraction)
+    }
+
+
+@router.get("/company", response_model=Dict[str, Any])
+def get_company_analysis(
+    days: int = Query(30, description="时间窗口（天数）"),
+    role_family: Optional[str] = Query(None, description="按角色族过滤"),
+    seniority: Optional[str] = Query(None, description="按资历级别过滤"),
+    location: Optional[str] = Query(None, description="按地点过滤"),
+    session: Session = Depends(get_session)
+):
+    """
+    获取公司分析
+    
+    返回：
+    - top_companies: Top 20 招聘公司（按职位数）
+    - company_trends: 公司招聘趋势（时间序列）
+    - company_role_family_preference: 公司角色族偏好
+    """
+    # 计算时间窗口
+    end_date = datetime.utcnow()
+    start_date = end_date - timedelta(days=days)
+    
+    # 构建基础查询
+    job_query = select(Job).where(Job.captured_at >= start_date, Job.captured_at <= end_date)
+    
+    # 应用过滤条件
+    if role_family:
+        job_query = job_query.where(Job.role_family == role_family)
+    if seniority:
+        seniority_mapping = {
+            'graduate': Seniority.JUNIOR,
+            'junior': Seniority.JUNIOR,
+            'intermediate': Seniority.MID,
+            'mid': Seniority.MID,
+            'senior': Seniority.SENIOR
+        }
+        mapped_seniority = seniority_mapping.get(seniority.lower())
+        if mapped_seniority:
+            job_query = job_query.where(Job.seniority == mapped_seniority)
+        else:
+            try:
+                job_query = job_query.where(Job.seniority == Seniority(seniority.lower()))
+            except ValueError:
+                pass
+    if location:
+        job_query = job_query.where(Job.location.contains(location))
+    
+    jobs = session.exec(job_query).all()
+    job_ids = [job.id for job in jobs]
+    
+    # 只获取有Extraction的Job
+    if job_ids:
+        extraction_query = select(Extraction).where(Extraction.job_id.in_(job_ids))
+        extractions = session.exec(extraction_query).all()
+        extraction_job_ids = {ext.job_id for ext in extractions}
+        jobs_with_extraction = [job for job in jobs if job.id in extraction_job_ids]
+    else:
+        jobs_with_extraction = []
+    
+    # 1. Top 20 招聘公司
+    company_counter = Counter()
+    for job in jobs_with_extraction:
+        if job.company:
+            company_counter[job.company] += 1
+    
+    top_companies = [
+        {"company": company, "count": count}
+        for company, count in company_counter.most_common(20)
+    ]
+    
+    # 2. 公司招聘趋势（按周统计）
+    company_trends: Dict[str, Dict[str, int]] = defaultdict(lambda: defaultdict(int))
+    for job in jobs_with_extraction:
+        if job.company and job.posted_date:
+            # 获取该周的周一日期
+            days_since_monday = job.posted_date.weekday()
+            monday = job.posted_date - timedelta(days=days_since_monday)
+            week_key = monday.strftime("%Y-%m-%d")
+            company_trends[job.company][week_key] += 1
+    
+    # 转换为列表格式（只保留Top 10公司）
+    top_10_companies = [item["company"] for item in top_companies[:10]]
+    company_trends_dict = {}
+    for company in top_10_companies:
+        if company in company_trends:
+            company_trends_dict[company] = [
+                {"week": week, "count": count}
+                for week, count in sorted(company_trends[company].items())
+            ]
+    
+    # 3. 公司角色族偏好
+    company_role_family_preference: Dict[str, Dict[str, int]] = defaultdict(lambda: defaultdict(int))
+    for job in jobs_with_extraction:
+        if job.company and job.role_family:
+            company_role_family_preference[job.company][job.role_family] += 1
+    
+    # 转换为前端需要的格式（只保留Top 10公司）
+    company_role_family_preference_dict = {}
+    for company in top_10_companies:
+        if company in company_role_family_preference:
+            company_role_family_preference_dict[company] = dict(company_role_family_preference[company])
+    
+    return {
+        "top_companies": top_companies,
+        "company_trends": company_trends_dict,
+        "company_role_family_preference": company_role_family_preference_dict,
+        "total_jobs": len(jobs_with_extraction)
+    }

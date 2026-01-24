@@ -13,8 +13,8 @@ export default function RootLayout({
   children: React.ReactNode
 }) {
   return (
-    <html lang="en-GB">
-      <body className="antialiased">
+    <html lang="en-GB" suppressHydrationWarning>
+      <body className="antialiased" suppressHydrationWarning>
         <nav className="bg-gray-900 text-white p-4">
           <div className="container mx-auto flex items-center justify-between">
             <Link href="/" className="text-xl font-bold hover:text-gray-300 transition-colors">
@@ -25,7 +25,8 @@ export default function RootLayout({
                 Home
               </Link>
               <Link href="/jobs" className="hover:text-gray-300 transition-colors">Job List</Link>
-              <Link href="/trends" className="hover:text-gray-300 transition-colors">Trend Analysis</Link>
+              <Link href="/analysis" className="hover:text-gray-300 transition-colors">Analysis</Link>
+              <Link href="/trends" className="hover:text-gray-300 transition-colors">Trends (Legacy)</Link>
             </div>
           </div>
         </nav>
