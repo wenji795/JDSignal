@@ -26,7 +26,6 @@ export default function RootLayout({
               </Link>
               <Link href="/jobs" className="hover:text-gray-300 transition-colors">Job List</Link>
               <Link href="/analysis" className="hover:text-gray-300 transition-colors">Analysis</Link>
-              <Link href="/trends" className="hover:text-gray-300 transition-colors">Trends (Legacy)</Link>
             </div>
           </div>
         </nav>

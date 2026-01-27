@@ -321,9 +321,9 @@ export default function Home() {
           <p className="text-gray-600">View all jobs, filter and manage job information</p>
         </Link>
         
-        <Link href="/trends" className="p-6 border rounded-lg hover:shadow-lg transition-shadow">
-          <h2 className="text-2xl font-semibold mb-2">Trend Analysis</h2>
-          <p className="text-gray-600">View keyword trends and statistical analysis</p>
+        <Link href="/analysis" className="p-6 border rounded-lg hover:shadow-lg transition-shadow">
+          <h2 className="text-2xl font-semibold mb-2">Job Market Analysis</h2>
+          <p className="text-gray-600">View comprehensive job market analysis, trends and statistics</p>
         </Link>
         
         <Link href="/manual-job" className="p-6 border rounded-lg hover:shadow-lg transition-shadow">
