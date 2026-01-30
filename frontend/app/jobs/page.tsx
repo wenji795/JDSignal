@@ -10,8 +10,8 @@ export default function JobsPage() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [filters, setFilters] = useState({
-    role_family: '',
-    seniority: ''
+    role_family: [] as string[],
+    seniority: [] as string[]
   })
 
   const roleFamilies = [
@@ -99,16 +99,16 @@ export default function JobsPage() {
     try {
       setLoading(true)
       setError(null)
-      // Ensure empty strings are not sent (backend will treat them as valid values)
+      // Ensure empty arrays are not sent (backend will treat them as valid values)
       const params: {
-        role_family?: string;
-        seniority?: string;
+        role_family?: string[];
+        seniority?: string[];
       } = {}
       
-      if (filters.role_family && filters.role_family.trim()) {
+      if (filters.role_family && filters.role_family.length > 0) {
         params.role_family = filters.role_family
       }
-      if (filters.seniority && filters.seniority.trim()) {
+      if (filters.seniority && filters.seniority.length > 0) {
         params.seniority = filters.seniority
       }
       
@@ -171,39 +171,70 @@ export default function JobsPage() {
       </div>
       
       {/* Filters */}
-      <div className="bg-gray-50 p-4 rounded-lg mb-6 flex gap-4 items-end">
-        <div className="flex-1">
-          <label className="block text-sm font-medium mb-1">Role Family</label>
-          <select
-            value={filters.role_family}
-            onChange={(e) => setFilters({ ...filters, role_family: e.target.value })}
-            className="w-full p-2 border rounded"
-          >
-            <option value="">All</option>
-            {roleFamilies.map(rf => (
-              <option key={rf} value={rf}>{roleFamilyLabels[rf] || rf}</option>
-            ))}
-          </select>
-        </div>
-        
-        <div className="flex-1">
-          <label className="block text-sm font-medium mb-1">Seniority Level</label>
-          <select
-            value={filters.seniority}
-            onChange={(e) => setFilters({ ...filters, seniority: e.target.value })}
-            className="w-full p-2 border rounded"
-          >
-            <option value="">All</option>
-            {seniorities.map(s => (
-              <option key={s} value={s === 'intermediate' ? 'mid' : s}>
-                {seniorityLabels[s] || s}
-              </option>
-            ))}
-          </select>
+      <div className="bg-gray-50 p-4 rounded-lg mb-6">
+        <div className="flex gap-4 items-start mb-4">
+          <div className="flex-1">
+            <label className="block text-sm font-medium mb-2">Role Family</label>
+            <div className="bg-white border rounded p-2">
+              {roleFamilies.map(rf => (
+                <label key={rf} className="flex items-center gap-2 p-1 hover:bg-gray-50 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={filters.role_family.includes(rf)}
+                    onChange={(e) => {
+                      if (e.target.checked) {
+                        setFilters({ ...filters, role_family: [...filters.role_family, rf] })
+                      } else {
+                        setFilters({ ...filters, role_family: filters.role_family.filter(r => r !== rf) })
+                      }
+                    }}
+                    className="cursor-pointer"
+                  />
+                  <span className="text-sm">{roleFamilyLabels[rf] || rf}</span>
+                </label>
+              ))}
+            </div>
+            {filters.role_family.length > 0 && (
+              <div className="mt-2 text-xs text-gray-600">
+                已选择 {filters.role_family.length} 项
+              </div>
+            )}
+          </div>
+          
+          <div className="flex-1">
+            <label className="block text-sm font-medium mb-2">Seniority Level</label>
+            <div className="bg-white border rounded p-2">
+              {seniorities.map(s => {
+                const value = s === 'intermediate' ? 'mid' : s
+                return (
+                  <label key={s} className="flex items-center gap-2 p-1 hover:bg-gray-50 cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={filters.seniority.includes(value)}
+                      onChange={(e) => {
+                        if (e.target.checked) {
+                          setFilters({ ...filters, seniority: [...filters.seniority, value] })
+                        } else {
+                          setFilters({ ...filters, seniority: filters.seniority.filter(se => se !== value) })
+                        }
+                      }}
+                      className="cursor-pointer"
+                    />
+                    <span className="text-sm">{seniorityLabels[s] || s}</span>
+                  </label>
+                )
+              })}
+            </div>
+            {filters.seniority.length > 0 && (
+              <div className="mt-2 text-xs text-gray-600">
+                已选择 {filters.seniority.length} 项
+              </div>
+            )}
+          </div>
         </div>
         
         <button
-          onClick={() => setFilters({ role_family: '', seniority: '' })}
+          onClick={() => setFilters({ role_family: [], seniority: [] })}
           className="px-4 py-2 bg-gray-200 rounded hover:bg-gray-300"
         >
           Reset

@@ -174,15 +174,27 @@ export interface SkillCombinationAnalysisResponse {
  */
 export async function getJobs(params?: {
   status?: string;
-  role_family?: string;
-  seniority?: string;
+  role_family?: string | string[];
+  seniority?: string | string[];
   keyword?: string;
   location?: string;
 }): Promise<Job[]> {
   const queryParams = new URLSearchParams();
   if (params?.status) queryParams.append('status', params.status);
-  if (params?.role_family) queryParams.append('role_family', params.role_family);
-  if (params?.seniority) queryParams.append('seniority', params.seniority);
+  if (params?.role_family) {
+    if (Array.isArray(params.role_family)) {
+      params.role_family.forEach(rf => queryParams.append('role_family', rf));
+    } else {
+      queryParams.append('role_family', params.role_family);
+    }
+  }
+  if (params?.seniority) {
+    if (Array.isArray(params.seniority)) {
+      params.seniority.forEach(s => queryParams.append('seniority', s));
+    } else {
+      queryParams.append('seniority', params.seniority);
+    }
+  }
   if (params?.keyword) queryParams.append('keyword', params.keyword);
   if (params?.location) queryParams.append('location', params.location);
   

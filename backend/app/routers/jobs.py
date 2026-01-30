@@ -133,8 +133,8 @@ async def create_job(job_data: JobCreate, session: Session = Depends(get_session
 @router.get("", response_model=List[JobResponse])
 def list_jobs(
     status: Optional[JobStatus] = Query(None, description="按状态过滤"),
-    role_family: Optional[str] = Query(None, description="按角色族过滤"),
-    seniority: Optional[str] = Query(None, description="按资历级别过滤（支持graduate/junior/intermediate/mid/senior/manager/lead/architect/unknown）"),
+    role_family: Optional[List[str]] = Query(None, description="按角色族过滤（支持多选）"),
+    seniority: Optional[List[str]] = Query(None, description="按资历级别过滤（支持多选，支持graduate/junior/intermediate/mid/senior/manager/lead/architect/unknown）"),
     keyword: Optional[str] = Query(None, description="关键词搜索（在jd_text中）"),
     location: Optional[str] = Query(None, description="按地点过滤（支持部分匹配，如'New Zealand'或'NZ'）"),
     session: Session = Depends(get_session)
@@ -147,7 +147,11 @@ def list_jobs(
     if status:
         conditions.append(Job.status == status)
     if role_family:
-        conditions.append(Job.role_family == role_family)
+        # 支持多选：如果传入列表，使用 in_ 操作符
+        if isinstance(role_family, list) and len(role_family) > 0:
+            conditions.append(Job.role_family.in_(role_family))
+        elif isinstance(role_family, str):
+            conditions.append(Job.role_family == role_family)
     if seniority:
         # 映射前端的显示名称到实际的枚举值
         seniority_mapping = {
@@ -161,16 +165,32 @@ def list_jobs(
             'architect': Seniority.ARCHITECT,
             'unknown': Seniority.UNKNOWN
         }
-        # 如果传入的是映射值，使用映射；否则尝试直接转换
-        mapped_seniority = seniority_mapping.get(seniority.lower())
-        if mapped_seniority:
-            conditions.append(Job.seniority == mapped_seniority)
-        else:
-            # 尝试直接转换为枚举
-            try:
-                conditions.append(Job.seniority == Seniority(seniority.lower()))
-            except ValueError:
-                pass  # 无效的seniority值，忽略
+        # 支持多选：如果传入列表，映射所有值并使用 in_ 操作符
+        if isinstance(seniority, list) and len(seniority) > 0:
+            mapped_seniorities = []
+            for s in seniority:
+                mapped = seniority_mapping.get(s.lower())
+                if mapped:
+                    mapped_seniorities.append(mapped)
+                else:
+                    # 尝试直接转换为枚举
+                    try:
+                        mapped_seniorities.append(Seniority(s.lower()))
+                    except ValueError:
+                        pass  # 无效的seniority值，忽略
+            if mapped_seniorities:
+                conditions.append(Job.seniority.in_(mapped_seniorities))
+        elif isinstance(seniority, str):
+            # 单个值的情况（向后兼容）
+            mapped_seniority = seniority_mapping.get(seniority.lower())
+            if mapped_seniority:
+                conditions.append(Job.seniority == mapped_seniority)
+            else:
+                # 尝试直接转换为枚举
+                try:
+                    conditions.append(Job.seniority == Seniority(seniority.lower()))
+                except ValueError:
+                    pass  # 无效的seniority值，忽略
     if keyword:
         conditions.append(Job.jd_text.contains(keyword))
     if location:
