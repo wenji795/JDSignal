@@ -123,6 +123,9 @@ def should_filter_keyword(term: str) -> bool:
 
 router = APIRouter(prefix="/analytics", tags=["analytics"])
 
+# 最大时间窗口限制（180天）
+MAX_DAYS_WINDOW = 180
+
 
 @router.get("/trends", response_model=Dict[str, Any])
 def get_trends(
@@ -146,6 +149,9 @@ def get_trends(
         - by_role_family: 按角色族分组的Top 5关键词变化
     """
     from sqlmodel import or_
+    
+    # 限制时间窗口最大为180天
+    days = min(days, MAX_DAYS_WINDOW)
     
     # 计算时间窗口
     end_date = datetime.utcnow()
@@ -596,6 +602,9 @@ def get_time_trends(
     - activity_summary: 招聘活跃度统计（按周/月）
     """
     
+    # 限制时间窗口最大为180天
+    days = min(days, MAX_DAYS_WINDOW)
+    
     # 验证granularity参数
     if granularity not in ["day", "week", "month"]:
         granularity = "day"
@@ -847,12 +856,18 @@ def get_location_analysis(
     - location_by_role_family: 不同城市的角色族分布
     - location_trends: 城市职位需求趋势
     """
+    # 限制时间窗口最大为180天
+    days = min(days, MAX_DAYS_WINDOW)
+    
     # 计算时间窗口
     end_date = datetime.utcnow()
     start_date = end_date - timedelta(days=days)
     
-    # 构建基础查询
-    job_query = select(Job).where(Job.captured_at >= start_date, Job.captured_at <= end_date)
+    # 构建基础查询 - 同时基于captured_at和posted_date过滤
+    job_query = select(Job).where(
+        Job.captured_at >= start_date, 
+        Job.captured_at <= end_date
+    )
     
     # 应用过滤条件
     if role_family:
@@ -916,16 +931,22 @@ def get_location_analysis(
         location_by_role_family_dict[city] = dict(role_families)
     
     # 3. 城市职位需求趋势（按周统计）
+    # 重要：只统计posted_date在时间窗口内的数据
     location_trends: Dict[str, List[Dict[str, Any]]] = defaultdict(lambda: defaultdict(int))
     for job in jobs_with_extraction:
         if job.location and job.posted_date:
+            # 确保posted_date在时间窗口内
+            if job.posted_date < start_date or job.posted_date > end_date:
+                continue
             location_parts = job.location.split(',')
             city = location_parts[0].strip() if location_parts else job.location.strip()
             # 获取该周的周一日期
             days_since_monday = job.posted_date.weekday()
             monday = job.posted_date - timedelta(days=days_since_monday)
             week_key = monday.strftime("%Y-%m-%d")
-            location_trends[city][week_key] += 1
+            # 确保周的开始日期也在时间窗口内
+            if monday >= start_date:
+                location_trends[city][week_key] += 1
     
     # 转换为列表格式
     location_trends_dict = {}
@@ -959,6 +980,9 @@ def get_company_analysis(
     - company_trends: 公司招聘趋势（时间序列）
     - company_role_family_preference: 公司角色族偏好
     """
+    # 限制时间窗口最大为180天
+    days = min(days, MAX_DAYS_WINDOW)
+    
     # 计算时间窗口
     end_date = datetime.utcnow()
     start_date = end_date - timedelta(days=days)
@@ -1012,14 +1036,20 @@ def get_company_analysis(
     ]
     
     # 2. 公司招聘趋势（按周统计）
+    # 重要：只统计posted_date在时间窗口内的数据
     company_trends: Dict[str, Dict[str, int]] = defaultdict(lambda: defaultdict(int))
     for job in jobs_with_extraction:
         if job.company and job.posted_date:
+            # 确保posted_date在时间窗口内
+            if job.posted_date < start_date or job.posted_date > end_date:
+                continue
             # 获取该周的周一日期
             days_since_monday = job.posted_date.weekday()
             monday = job.posted_date - timedelta(days=days_since_monday)
             week_key = monday.strftime("%Y-%m-%d")
-            company_trends[job.company][week_key] += 1
+            # 确保周的开始日期也在时间窗口内
+            if monday >= start_date:
+                company_trends[job.company][week_key] += 1
     
     # 转换为列表格式（只保留Top 10公司）
     top_10_companies = [item["company"] for item in top_companies[:10]]
@@ -1067,6 +1097,9 @@ def get_experience_analysis(
     - experience_by_role_family: 不同角色族的经验要求对比
     - experience_trends: 经验要求随时间的变化趋势
     """
+    # 限制时间窗口最大为180天
+    days = min(days, MAX_DAYS_WINDOW)
+    
     # 计算时间窗口
     end_date = datetime.utcnow()
     start_date = end_date - timedelta(days=days)
@@ -1160,14 +1193,20 @@ def get_experience_analysis(
         experience_by_role_family_dict[role_fam] = dict(counter)
     
     # 3. 经验要求随时间的变化趋势（按周统计，只统计平均经验要求）
+    # 重要：只统计posted_date在时间窗口内的数据
     experience_trends: Dict[str, List[int]] = defaultdict(list)
     for job in jobs_with_extraction:
         extraction = extraction_map.get(job.id)
         if extraction and extraction.years_required is not None and job.posted_date:
+            # 确保posted_date在时间窗口内
+            if job.posted_date < start_date or job.posted_date > end_date:
+                continue
             days_since_monday = job.posted_date.weekday()
             monday = job.posted_date - timedelta(days=days_since_monday)
             week_key = monday.strftime("%Y-%m-%d")
-            experience_trends[week_key].append(extraction.years_required)
+            # 确保周的开始日期也在时间窗口内
+            if monday >= start_date:
+                experience_trends[week_key].append(extraction.years_required)
     
     # 计算每周的平均经验要求
     experience_trends_list = []
@@ -1204,6 +1243,9 @@ def get_education_analysis(
     - degree_by_role_family: 不同角色族的学历要求对比
     - certifications_distribution: 证书要求统计
     """
+    # 限制时间窗口最大为180天
+    days = min(days, MAX_DAYS_WINDOW)
+    
     # 计算时间窗口
     end_date = datetime.utcnow()
     start_date = end_date - timedelta(days=days)
@@ -1334,6 +1376,9 @@ def get_industry_analysis(
     - industry_by_role_family: 不同行业的角色族分布
     - industry_trends: 行业招聘趋势
     """
+    # 限制时间窗口最大为180天
+    days = min(days, MAX_DAYS_WINDOW)
+    
     # 计算时间窗口
     end_date = datetime.utcnow()
     start_date = end_date - timedelta(days=days)
@@ -1397,13 +1442,19 @@ def get_industry_analysis(
         industry_by_role_family_dict[industry] = dict(role_families)
     
     # 3. 行业招聘趋势（按周统计）
+    # 重要：只统计posted_date在时间窗口内的数据
     industry_trends: Dict[str, Dict[str, int]] = defaultdict(lambda: defaultdict(int))
     for job in jobs_with_extraction:
         if job.industry and job.posted_date:
+            # 确保posted_date在时间窗口内
+            if job.posted_date < start_date or job.posted_date > end_date:
+                continue
             days_since_monday = job.posted_date.weekday()
             monday = job.posted_date - timedelta(days=days_since_monday)
             week_key = monday.strftime("%Y-%m-%d")
-            industry_trends[job.industry][week_key] += 1
+            # 确保周的开始日期也在时间窗口内
+            if monday >= start_date:
+                industry_trends[job.industry][week_key] += 1
     
     # 转换为列表格式（只保留Top 10行业）
     top_10_industries = [item["industry"] for item in industry_distribution[:10]]
@@ -1438,6 +1489,9 @@ def get_source_analysis(
     - source_distribution: 数据来源分布
     - source_quality: 不同来源的职位质量对比（提取成功率）
     """
+    # 限制时间窗口最大为180天
+    days = min(days, MAX_DAYS_WINDOW)
+    
     # 计算时间窗口
     end_date = datetime.utcnow()
     start_date = end_date - timedelta(days=days)
@@ -1526,6 +1580,9 @@ def get_skill_combination_analysis(
     - must_have_vs_nice_to_have: Must-have vs Nice-to-have 对比
     - skill_intensity_by_role_family: 按角色族统计技能出现频率（Top 10技能）
     """
+    # 限制时间窗口最大为180天
+    days = min(days, MAX_DAYS_WINDOW)
+    
     # 计算时间窗口
     end_date = datetime.utcnow()
     start_date = end_date - timedelta(days=days)

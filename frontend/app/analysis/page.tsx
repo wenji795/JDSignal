@@ -103,12 +103,14 @@ export default function AnalysisPage() {
   const loadTrends = async () => {
     try {
       setLoading(true)
+      // 确保days不超过180天
+      const effectiveDays = Math.min(days, 180)
       const params: {
         days: number;
         role_family?: string;
         seniority?: string;
         location?: string;
-      } = { days }
+      } = { days: effectiveDays }
       
       if (roleFamily && roleFamily.trim()) {
         params.role_family = roleFamily
@@ -130,8 +132,10 @@ export default function AnalysisPage() {
     }
   }
 
+  // 确保days不超过180天
+  const effectiveDays = Math.min(days, 180)
   const filterParams = {
-    days,
+    days: effectiveDays,
     role_family: roleFamily || undefined,
     seniority: seniority || undefined,
     location: location || undefined
@@ -216,13 +220,18 @@ export default function AnalysisPage() {
             <label className="text-sm font-medium">Time Window:</label>
             <select
               value={days}
-              onChange={(e) => setDays(Number(e.target.value))}
+              onChange={(e) => {
+                const selectedDays = Number(e.target.value)
+                // 限制最大值为180天
+                setDays(Math.min(selectedDays, 180))
+              }}
               className="p-2 border rounded text-sm"
             >
               <option value={7}>7 days</option>
               <option value={30}>30 days</option>
               <option value={60}>60 days</option>
               <option value={90}>90 days</option>
+              <option value={180}>180 days</option>
             </select>
           </div>
           
@@ -268,7 +277,10 @@ export default function AnalysisPage() {
       {/* Analysis Sections */}
       <div className="space-y-8">
         {/* Section 0: Overview Statistics */}
-        <section>
+        <section className="bg-blue-50/30 border border-blue-200 rounded-lg p-6">
+          <div className="mb-2 text-sm text-blue-700 font-medium">
+            ⏱️ 受时间窗口限制（当前: {effectiveDays} 天，最大: 180 天）
+          </div>
           <h2 className="text-2xl font-semibold mb-4">Overview</h2>
           
           {/* Total Jobs */}
@@ -372,7 +384,10 @@ export default function AnalysisPage() {
         </section>
 
         {/* Section 1: Keyword Analysis */}
-        <section>
+        <section className="bg-blue-50/30 border border-blue-200 rounded-lg p-6">
+          <div className="mb-2 text-sm text-blue-700 font-medium">
+            ⏱️ 受时间窗口限制（当前: {effectiveDays} 天，最大: 180 天）
+          </div>
           <h2 className="text-2xl font-semibold mb-4">Keyword Analysis</h2>
           
           {/* Top Keywords */}
@@ -544,13 +559,19 @@ export default function AnalysisPage() {
         </section>
 
         {/* Section 2: Time Trends */}
-        <section>
+        <section className="bg-blue-50/30 border border-blue-200 rounded-lg p-6">
+          <div className="mb-2 text-sm text-blue-700 font-medium">
+            ⏱️ 受时间窗口限制（当前: {effectiveDays} 天，最大: 180 天）
+          </div>
           <h2 className="text-2xl font-semibold mb-4">Time Trends</h2>
           <TimeTrends {...filterParams} />
         </section>
 
         {/* Section 3: Location Analysis */}
-        <section id="location-analysis">
+        <section id="location-analysis" className="bg-blue-50/30 border border-blue-200 rounded-lg p-6">
+          <div className="mb-2 text-sm text-blue-700 font-medium">
+            ⏱️ 受时间窗口限制（当前: {effectiveDays} 天，最大: 180 天）
+          </div>
           <h2 className="text-2xl font-semibold mb-4">Location Analysis</h2>
           <ErrorBoundary componentName="Location Analysis">
             <LocationAnalysis {...filterParams} />
@@ -558,7 +579,10 @@ export default function AnalysisPage() {
         </section>
 
         {/* Section 4: Company Analysis */}
-        <section id="company-analysis">
+        <section id="company-analysis" className="bg-blue-50/30 border border-blue-200 rounded-lg p-6">
+          <div className="mb-2 text-sm text-blue-700 font-medium">
+            ⏱️ 受时间窗口限制（当前: {effectiveDays} 天，最大: 180 天）
+          </div>
           <h2 className="text-2xl font-semibold mb-4">Company Analysis</h2>
           <ErrorBoundary componentName="Company Analysis">
             <CompanyAnalysis {...filterParams} />
@@ -566,7 +590,10 @@ export default function AnalysisPage() {
         </section>
 
         {/* Section 5: Skill Combination Analysis */}
-        <section id="skill-combination-analysis">
+        <section id="skill-combination-analysis" className="bg-blue-50/30 border border-blue-200 rounded-lg p-6">
+          <div className="mb-2 text-sm text-blue-700 font-medium">
+            ⏱️ 受时间窗口限制（当前: {effectiveDays} 天，最大: 180 天）
+          </div>
           <h2 className="text-2xl font-semibold mb-4">Skill Combination Analysis</h2>
           <ErrorBoundary componentName="Skill Combination Analysis">
             <SkillCombinationAnalysis {...filterParams} />
@@ -574,7 +601,10 @@ export default function AnalysisPage() {
         </section>
 
         {/* Section 6: Experience Analysis */}
-        <section id="experience-analysis">
+        <section id="experience-analysis" className="bg-blue-50/30 border border-blue-200 rounded-lg p-6">
+          <div className="mb-2 text-sm text-blue-700 font-medium">
+            ⏱️ 受时间窗口限制（当前: {effectiveDays} 天，最大: 180 天）
+          </div>
           <h2 className="text-2xl font-semibold mb-4">Experience Requirements</h2>
           <ErrorBoundary componentName="Experience Analysis">
             <ExperienceAnalysis {...filterParams} />
@@ -582,7 +612,10 @@ export default function AnalysisPage() {
         </section>
 
         {/* Section 7: Education Analysis */}
-        <section id="education-analysis">
+        <section id="education-analysis" className="bg-blue-50/30 border border-blue-200 rounded-lg p-6">
+          <div className="mb-2 text-sm text-blue-700 font-medium">
+            ⏱️ 受时间窗口限制（当前: {effectiveDays} 天，最大: 180 天）
+          </div>
           <h2 className="text-2xl font-semibold mb-4">Education Requirements</h2>
           <ErrorBoundary componentName="Education Analysis">
             <EducationAnalysis {...filterParams} />
@@ -590,7 +623,10 @@ export default function AnalysisPage() {
         </section>
 
         {/* Section 8: Industry Analysis */}
-        <section id="industry-analysis">
+        <section id="industry-analysis" className="bg-blue-50/30 border border-blue-200 rounded-lg p-6">
+          <div className="mb-2 text-sm text-blue-700 font-medium">
+            ⏱️ 受时间窗口限制（当前: {effectiveDays} 天，最大: 180 天）
+          </div>
           <h2 className="text-2xl font-semibold mb-4">Industry Analysis</h2>
           <ErrorBoundary componentName="Industry Analysis">
             <IndustryAnalysis {...filterParams} />
@@ -598,7 +634,10 @@ export default function AnalysisPage() {
         </section>
 
         {/* Section 9: Source Analysis */}
-        <section id="source-analysis">
+        <section id="source-analysis" className="bg-blue-50/30 border border-blue-200 rounded-lg p-6">
+          <div className="mb-2 text-sm text-blue-700 font-medium">
+            ⏱️ 受时间窗口限制（当前: {effectiveDays} 天，最大: 180 天）
+          </div>
           <h2 className="text-2xl font-semibold mb-4">Data Source Analysis</h2>
           <ErrorBoundary componentName="Source Analysis">
             <SourceAnalysis {...filterParams} />
